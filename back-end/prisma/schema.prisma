@@ -1,0 +1,211 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Appointment {
+  id           Int       @id @default(autoincrement())
+  patientId    Int?
+  name         String?   
+  email        String?
+  phone        String?
+  date         DateTime? @db.Date
+  departmentId Int?
+  doctorId     Int?
+  message      String?
+  status       String    @default("Registered") // Registered, Waiting, With Doctor, Procedure, Completed, Billing, Closed
+  visitType    String    @default("Consultation") // Consultation, Follow-up, Procedure
+  priority     String    @default("Normal")       // Normal, Urgent
+  referredBy   String?
+  token        Int?
+  paymentStatus String   @default("Pending") // Pending, Paid
+  serviceCharge Float?
+  handledBy    String?   
+  notes        String?
+  estimatedWait Int?     // in minutes
+  isWalkIn     Boolean   @default(true)
+  arrivedAt    DateTime  @default(now())
+  startedAt    DateTime? 
+  completedAt  DateTime? 
+  patient      Patient?  @relation(fields: [patientId], references: [id])
+  department   Department? @relation(fields: [departmentId], references: [id])
+  doctor       Doctor?     @relation(fields: [doctorId], references: [id])
+}
+
+model Patient {
+  id           Int           @id @default(autoincrement())
+  name         String
+  age          Int?
+  gender       String?
+  phone        String?       @unique
+  address      String?
+  appointments Appointment[]
+  createdAt    DateTime      @default(now())
+}
+
+model Doctor {
+  id           Int     @id @default(autoincrement())
+  name         String?
+  specialization String?
+  onDuty       Boolean @default(true)
+  availability String  @default("Available") // Available, Busy, On Break
+  appointments Appointment[]
+}
+
+model Department {
+  id   Int     @id @default(autoincrement())
+  name String?
+  appointments Appointment[]
+}
+
+model Inquiry {
+  id      Int      @id @default(autoincrement())
+  name    String?
+  email   String?
+  phone   String?
+  subject String?
+  message String?
+  status  Boolean?
+}
+
+model Users {
+  id       Int     @id @default(autoincrement())
+  email    String? @unique
+  password String?
+}
+
+model Staff {
+  id          Int      @id @default(autoincrement())
+  name        String
+  role        String   @default("Staff") 
+  contact     String?
+  salary      Float?
+  joiningDate DateTime @default(now())
+  attendance  Attendance[]
+  salaries    SalaryPayment[]
+}
+
+model Attendance {
+  id           Int      @id @default(autoincrement())
+  staffId      Int
+  date         DateTime @db.Date
+  checkIn      DateTime?
+  checkOut     DateTime?
+  workingHours Float?
+  status       String   @default("Present") 
+  staff        Staff    @relation(fields: [staffId], references: [id])
+}
+
+model DentalLabOrder {
+  id             Int       @id @default(autoincrement())
+  patientName    String
+  treatmentType  String    
+  labName        String?   // New field
+  caseType       String?   // Crown, Denture, Implant
+  trialCount     Int       @default(1)
+  impressionDate DateTime  @default(now())
+  sentToLabDate  DateTime?
+  expectedReturn DateTime?
+  actualReturn   DateTime?
+  status         String    @default("Impression Taken") // Impression Taken, Sent to Lab, In Fabrication, Ready for Fit, Fitting Scheduled, Completed
+  isDelayed      Boolean   @default(false)
+  cost           Float?
+  notes          String?
+  followUpDate   DateTime?
+  receptionAction String    @default("Pending")
+  createdAt      DateTime  @default(now())
+}
+
+model SalaryPayment {
+  id      Int      @id @default(autoincrement())
+  staffId Int
+  month   String
+  amount  Float
+  date    DateTime @default(now())
+  staff   Staff    @relation(fields: [staffId], references: [id])
+}
+
+model InventoryItem {
+  id           Int      @id @default(autoincrement())
+  name         String
+  category     String?
+  stock        Int      @default(0)
+  unit         String?
+  vendorName   String?  // New field
+  expiryDate   DateTime? // New field
+  purchases    PurchaseRecord[]
+  consumptions MaterialConsumption[]
+}
+
+model PurchaseRecord {
+  id       Int      @id @default(autoincrement())
+  itemId   Int
+  quantity Int
+  cost     Float
+  date     DateTime @default(now())
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+model MaterialConsumption {
+  id          Int      @id @default(autoincrement())
+  itemId      Int
+  quantity    Int
+  usedFor     String?  
+  date        DateTime @default(now())
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  category    String   
+  description String?
+  amount      Float
+  date        DateTime @default(now())
+}
+
+model RadiologyCase {
+  id             Int      @id @default(autoincrement())
+  patientName    String
+  type           String   
+  status         String   @default("Pending") 
+  technicianName String?
+  approvedBy     String?   
+  date           DateTime @default(now())
+  testDoneAt     DateTime?
+  typedAt        DateTime?
+  deliveredAt    DateTime?
+  cost           Float    @default(0)
+}
+
+model ClinicSettings {
+  id              Int      @id @default(1)
+  clinicName      String   @default("Radiance Clinic")
+  startTime       String   @default("09:00")
+  endTime         String   @default("21:00")
+  tokenResetRule  String   @default("Daily")
+  defaultXrayFee  Float    @default(500)
+  defaultUsgFee   Float    @default(1200)
+  labTurnaround   Int      @default(3)
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  module    String
+  userId    String?
+  details   String?
+  createdAt DateTime @default(now())
+}
+
+model DentalCase {
+  id          Int      @id @default(autoincrement())
+  patientName String
+  type        String   
+  status      String   @default("Scheduled")
+  date        DateTime @default(now())
+}
