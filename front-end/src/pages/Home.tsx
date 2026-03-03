@@ -19,7 +19,7 @@ const Home = () => {
                                 <span>Providing Top-Tier Healthcare</span>
                             </div>
 
-                            <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 leading-tight tracking-tight">
+                            <h1 className="text-5xl md:text-6xl font-bold text-slate-900 leading-tight tracking-tight">
                                 Comprehensive <br />
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-blue-500">
                                     Healthcare Solutions
@@ -41,19 +41,19 @@ const Home = () => {
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 border-t border-slate-200">
                                 <div>
-                                    <h4 className="text-3xl font-bold text-slate-900">3468</h4>
+                                    <h4 className="text-3xl font-semibold text-slate-900">3468</h4>
                                     <p className="text-sm text-slate-500 mt-1">Hospital Rooms</p>
                                 </div>
                                 <div>
-                                    <h4 className="text-3xl font-bold text-slate-900">557</h4>
+                                    <h4 className="text-3xl font-semibold text-slate-900">557</h4>
                                     <p className="text-sm text-slate-500 mt-1">Specialists</p>
                                 </div>
                                 <div>
-                                    <h4 className="text-3xl font-bold text-slate-900">4379</h4>
+                                    <h4 className="text-3xl font-semibold text-slate-900">4379</h4>
                                     <p className="text-sm text-slate-500 mt-1">Happy Patients</p>
                                 </div>
                                 <div>
-                                    <h4 className="text-3xl font-bold text-slate-900">32</h4>
+                                    <h4 className="text-3xl font-semibold text-slate-900">32</h4>
                                     <p className="text-sm text-slate-500 mt-1">Years Experience</p>
                                 </div>
                             </div>
@@ -73,8 +73,8 @@ const Home = () => {
                                         <ShieldCheck className="w-8 h-8 text-green-600" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">Certified Experts</p>
-                                        <p className="text-xs text-slate-500">World-class professionals</p>
+                                        <p className="text-sm font-semibold text-slate-800">Certified Experts</p>
+                                        <p className="text-xs text-slate-500">World-class Professionals</p>
                                     </div>
                                 </div>
                             </div>
@@ -87,8 +87,8 @@ const Home = () => {
             <section className="py-20 bg-white">
                 <div className="container mx-auto px-4">
                     <div className="text-center max-w-2xl mx-auto mb-16">
-                        <h2 className="text-primary-600 font-semibold tracking-wide uppercase text-sm mb-2">Why Choose Our Services?</h2>
-                        <h3 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Why Our Patients Trust Us</h3>
+                        <h2 className="text-primary-600 font-medium tracking-wide text-sm mb-2">Why Choose Our Services?</h2>
+                        <h3 className="text-3xl md:text-4xl font-semibold text-slate-900 mb-4">Why Our Patients Trust Us</h3>
                         <p className="text-slate-600">We are committed to delivering exceptional care with a personalized approach to each patient’s needs. Our team of dedicated professionals ensures the highest quality of care and the latest in medical advancements.</p>
                     </div>
 
@@ -98,7 +98,7 @@ const Home = () => {
                                 <div className="bg-white w-14 h-14 rounded-xl shadow-sm flex items-center justify-center mb-6 text-primary-600">
                                     {feature.icon}
                                 </div>
-                                <h4 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h4>
+                                <h4 className="text-xl font-semibold text-slate-900 mb-3">{feature.title}</h4>
                                 <p className="text-slate-600 leading-relaxed text-sm">
                                     {feature.desc}
                                 </p>

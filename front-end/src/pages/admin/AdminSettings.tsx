@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Settings, Save, Clock, IndianRupee, Bell, Shield, Terminal } from 'lucide-react';
+import { toast } from 'sonner';
 
 const AdminSettings = () => {
     const [settings, setSettings] = useState<any>({
@@ -10,7 +12,9 @@ const AdminSettings = () => {
         tokenResetRule: '',
         defaultXrayFee: 0,
         defaultUsgFee: 0,
-        labTurnaround: 0
+        labTurnaround: 0,
+        referralComm: 10,
+        doctorComm: 60
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -21,8 +25,8 @@ const AdminSettings = () => {
 
     const fetchSettings = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/admin/settings');
-            setSettings(res.data);
+            const data: any = await api.get('/admin/settings');
+            setSettings(data);
         } catch (err) {
             console.error('Settings fetch failed');
         } finally {
@@ -33,8 +37,8 @@ const AdminSettings = () => {
     const handleSave = async () => {
         setSaving(true);
         try {
-            await axios.patch('http://localhost:8080/api/admin/settings', settings);
-            alert('Settings updated successfully');
+            await api.patch('/admin/settings', settings);
+            toast.success('Settings updated successfully');
         } catch (err) {
             console.error('Update failed');
         } finally {
@@ -42,7 +46,21 @@ const AdminSettings = () => {
         }
     };
 
-    if (loading) return <div className="p-10 text-center font-black uppercase tracking-[0.2em] text-slate-400">Loading Configuration...</div>;
+    if (loading) {
+        return (
+            <div className="space-y-6 pb-8">
+                <div className="flex justify-between items-center">
+                    <Skeleton className="h-10 w-64" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Skeleton className="h-[300px] rounded-xl" />
+                    <Skeleton className="h-[300px] rounded-xl" />
+                    <Skeleton className="h-[200px] rounded-xl" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 pb-8">
@@ -144,6 +162,30 @@ const AdminSettings = () => {
                                 onChange={e => setSettings({ ...settings, labTurnaround: parseInt(e.target.value) })}
                                 className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow"
                             />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Doctor Split (%)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={settings.doctorComm !== undefined ? settings.doctorComm : ''}
+                                    onChange={e => setSettings({ ...settings, doctorComm: parseFloat(e.target.value) })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Referral Split (%)</label>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    value={settings.referralComm !== undefined ? settings.referralComm : ''}
+                                    onChange={e => setSettings({ ...settings, referralComm: parseFloat(e.target.value) })}
+                                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-shadow"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>

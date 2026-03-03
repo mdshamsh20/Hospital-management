@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Search, UserPlus, Building2, MoreVertical, RefreshCw, Activity, Phone, Calendar, UserCheck, MapPin, Clock, ArrowRight } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import api from '@/lib/api';
+import { appointmentSchema } from '@/lib/validations';
+import { Search, UserPlus, Building2, RefreshCw, Activity, Phone, Calendar, UserCheck, MapPin, Clock, Trash2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,14 +40,32 @@ const ReceptionistAppointments = () => {
     const [loading, setLoading] = useState(true);
     const [showRegisterModal, setShowRegisterModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [formData, setFormData] = useState({
-        name: '', age: '', gender: 'Male', phone: '',
-        departmentId: '', doctorId: '', visitType: 'Consultation',
-        priority: 'Normal', referredBy: '',
-        estimatedWait: '15', notes: '', isWalkIn: true
-    });
+
     const [departments, setDepartments] = useState<any[]>([]);
     const [doctors, setDoctors] = useState<any[]>([]);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const [deleteId, setDeleteId] = useState<number | null>(null);
+
+    const {
+        control,
+        register,
+        handleSubmit,
+        reset,
+        watch,
+        setValue,
+        formState: { errors, isSubmitting }
+    } = useForm<any>({
+        resolver: zodResolver(appointmentSchema),
+        defaultValues: {
+            gender: 'Male',
+            priority: 'Normal',
+            isWalkIn: true,
+            visitType: 'Consultation'
+        }
+    });
+
+    const isWalkIn = watch('isWalkIn');
+    const selectedGender = watch('gender');
 
     useEffect(() => {
         fetchMetadata();
@@ -53,56 +74,74 @@ const ReceptionistAppointments = () => {
 
     const fetchMetadata = async () => {
         try {
-            const [deptRes, docRes] = await Promise.all([
-                axios.get('http://localhost:8080/api/departments'),
-                axios.get('http://localhost:8080/api/doctors')
+            const [deptRes, docRes]: [any, any] = await Promise.all([
+                api.get('/departments'),
+                api.get('/doctors')
             ]);
-            setDepartments(deptRes.data);
-            setDoctors(docRes.data);
+            setDepartments(deptRes);
+            setDoctors(docRes);
         } catch (err) {
-            console.error('Failed to fetch metadata');
-            toast.error("Registry Sync Failed: Could not load clinical departments.");
+            // Handled
         }
     };
 
     const fetchAppointments = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8080/api/appointments');
-            setAppointments(res.data);
+            const data: any = await api.get('/appointments');
+            setAppointments(data);
         } catch (err) {
-            console.error('Failed to fetch appointments');
-            toast.error("Operation Sync Failed: Could not refresh appointment stream.");
+            // Handled
         } finally {
             setLoading(false);
         }
     };
 
-    const handleRegisterSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const onRegisterSubmit = async (data: any) => {
         try {
-            await axios.post('http://localhost:8080/api/appointments/register', formData);
+            await api.post('/appointments/register', data);
             setShowRegisterModal(false);
-            setFormData({
-                name: '', age: '', gender: 'Male', phone: '',
-                departmentId: '', doctorId: '', visitType: 'Consultation',
-                priority: 'Normal', referredBy: '',
-                estimatedWait: '15', notes: '', isWalkIn: true
-            });
+            reset();
             fetchAppointments();
-            toast.success("Registration Initialized: Patient data committed to ledger.");
+            toast.success("Patient successfully registered.");
         } catch (err) {
-            toast.error("Protocol Violation: Patient registration data rejected.");
+            // Handled
         }
     };
 
     const updateStatus = async (id: number, status: string) => {
         try {
-            await axios.patch(`http://localhost:8080/api/appointments/${id}/status`, { status });
+            await api.patch(`/appointments/${id}/status`, { status });
             fetchAppointments();
-            toast.success(`Lifecycle Transitioned: Status moved to ${status}`);
+            toast.success(`Patient status updated to ${status}`);
         } catch (err) {
-            toast.error("Transition Rejected: Internal system state conflict.");
+            // Handled
+        }
+    };
+
+    const deleteAppointment = async () => {
+        if (!deleteId) return;
+        try {
+            await api.delete(`/appointments/${deleteId}`);
+            fetchAppointments();
+            setShowDeleteDialog(false);
+            setDeleteId(null);
+            toast.success("Appointment canceled and removed.");
+        } catch (err) {
+            // Handled
+        }
+    };
+
+    const updateToken = async (id: number, currentToken: number) => {
+        const newToken = prompt("Modify Token Assignment:", currentToken.toString());
+        if (newToken === null || newToken === "" || isNaN(parseInt(newToken))) return;
+
+        try {
+            await api.patch(`/appointments/${id}/token`, { token: parseInt(newToken) });
+            fetchAppointments();
+            toast.success(`Token reassigned to #${newToken}`);
+        } catch (err) {
+            // Handled
         }
     };
 
@@ -137,10 +176,10 @@ const ReceptionistAppointments = () => {
         <div className="space-y-8 animate-fade-in-up pb-10">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div>
-                    <h1 className="text-4xl font-bold text-slate-900 tracking-tight uppercase leading-none">Operational Queue</h1>
-                    <div className="flex items-center mt-3">
-                        <span className="w-2.5 h-2.5 bg-indigo-500 rounded-full mr-2 shadow-[0_0_8px_rgba(99,102,241,0.4)]"></span>
-                        <p className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Live Flow & Lifecycle Management</p>
+                    <h1 className="text-3xl font-semibold text-slate-800 tracking-tight leading-tight">Patient Queue</h1>
+                    <div className="flex items-center mt-2.5">
+                        <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2 shadow-sm"></span>
+                        <p className="text-slate-500 text-[11px] font-medium tracking-wide">Manage daily patient appointments & walk-ins</p>
                     </div>
                 </div>
                 <div className="flex items-center space-x-3">
@@ -155,105 +194,171 @@ const ReceptionistAppointments = () => {
                     <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
                         <DialogTrigger asChild>
                             <Button
-                                className="h-12 bg-slate-900 text-white px-8 rounded-xl font-bold text-[10px] uppercase tracking-wider hover:bg-slate-800 transition shadow-2xl shadow-slate-900/10 border-none inline-flex items-center gap-2 group"
+                                className="h-10 bg-slate-900 text-white px-6 rounded-xl font-semibold text-[11px] tracking-wide hover:bg-slate-800 transition shadow-md inline-flex items-center gap-2 group"
                             >
-                                <UserPlus size={16} className="group-hover:rotate-12 transition-transform" />
-                                <span>New Case Entry</span>
+                                <UserPlus size={15} className="group-hover:rotate-12 transition-transform" />
+                                <span>New Patient Registration</span>
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-3xl border-none shadow-xl rounded-2xl p-6 bg-white overflow-y-auto max-h-[90vh]">
                             <DialogHeader className="mb-6 border-b border-slate-100 pb-4">
-                                <DialogTitle className="text-2xl font-bold text-slate-900 uppercase tracking-tight">New Case Entry</DialogTitle>
-                                <DialogDescription className="text-slate-500 text-xs font-semibold uppercase tracking-wider mt-1">
-                                    Initialize clinical lifecycle by entering demographic and diagnostic routing parameters.
+                                <DialogTitle className="text-xl font-semibold text-slate-800 tracking-tight">New Patient Registration</DialogTitle>
+                                <DialogDescription className="text-slate-500 text-[11px] font-medium tracking-wide mt-1">
+                                    Enter patient demographics and assign a consultation path.
                                 </DialogDescription>
                             </DialogHeader>
 
-                            <form onSubmit={handleRegisterSubmit} className="space-y-6">
+                            <form onSubmit={handleSubmit(onRegisterSubmit)} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Full Legal Name</label>
-                                        <Input required className="w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2 uppercase placeholder:text-slate-400" placeholder="SURNAME GIVEN NAME" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Full Legal Name</label>
+                                        <Input
+                                            {...register('name')}
+                                            className={`w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2 ${errors.name ? 'border-rose-500' : ''}`}
+                                            placeholder="e.g. Rahul Sharma"
+                                        />
+                                        {errors.name && <p className="text-[10px] text-rose-500 font-medium">{String(errors.name.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Contact Node</label>
-                                        <Input required className="w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2" placeholder="0XXXXXXXXX" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Contact Number</label>
+                                        <Input
+                                            {...register('phone')}
+                                            className={`w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2 ${errors.phone ? 'border-rose-500' : ''}`}
+                                            placeholder="0XXXXXXXXX"
+                                        />
+                                        {errors.phone && <p className="text-[10px] text-rose-500 font-medium">{String(errors.phone.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Bios Age</label>
-                                        <Input type="number" required className="w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2" value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })} />
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Patient Age</label>
+                                        <Input
+                                            type="number"
+                                            {...register('age', { valueAsNumber: true })}
+                                            className={`w-full bg-slate-50 border-slate-200 text-sm font-semibold text-slate-900 focus-visible:ring-indigo-500 rounded-xl px-4 py-2 ${errors.age ? 'border-rose-500' : ''}`}
+                                        />
+                                        {errors.age && <p className="text-[10px] text-rose-500 font-medium">{String(errors.age.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Biological Gender</label>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Gender</label>
                                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
-                                            {['Male', 'Female'].map(g => (
-                                                <Button key={g} type="button" variant={formData.gender === g ? "default" : "ghost"} onClick={() => setFormData({ ...formData, gender: g })} className={`flex-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all h-9 ${formData.gender === g ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}>{g}</Button>
+                                            {['Male', 'Female', 'Other'].map(g => (
+                                                <Button
+                                                    key={g}
+                                                    type="button"
+                                                    variant={selectedGender === g ? "default" : "ghost"}
+                                                    onClick={() => setValue('gender', g as any)}
+                                                    className={`flex-1 rounded-lg text-xs font-semibold tracking-wider transition-all h-9 ${selectedGender === g ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                                                >
+                                                    {g}
+                                                </Button>
                                             ))}
                                         </div>
+                                        {errors.gender && <p className="text-[10px] text-rose-500 font-medium">{String(errors.gender.message)}</p>}
                                     </div>
                                     <div className="space-y-2 md:col-span-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Flow Origin</label>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Patient Source</label>
                                         <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
-                                            <Button type="button" variant={formData.isWalkIn ? "default" : "ghost"} onClick={() => setFormData({ ...formData, isWalkIn: true })} className={`flex-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all h-9 ${formData.isWalkIn ? 'bg-amber-500 text-white shadow-sm hover:bg-amber-600' : 'text-slate-500 hover:bg-slate-200/50'}`}>Walk-in</Button>
-                                            <Button type="button" variant={!formData.isWalkIn ? "default" : "ghost"} onClick={() => setFormData({ ...formData, isWalkIn: false })} className={`flex-1 rounded-lg text-xs font-bold uppercase tracking-wider transition-all h-9 ${!formData.isWalkIn ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'text-slate-500 hover:bg-slate-200/50'}`}>Appointment</Button>
+                                            <Button
+                                                type="button"
+                                                variant={isWalkIn ? "default" : "ghost"}
+                                                onClick={() => setValue('isWalkIn', true)}
+                                                className={`flex-1 rounded-lg text-xs font-semibold tracking-wider transition-all h-9 ${isWalkIn ? 'bg-amber-500 text-white shadow-sm hover:bg-amber-600' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                                            >
+                                                Walk-in
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant={!isWalkIn ? "default" : "ghost"}
+                                                onClick={() => setValue('isWalkIn', false)}
+                                                className={`flex-1 rounded-lg text-xs font-semibold tracking-wider transition-all h-9 ${!isWalkIn ? 'bg-indigo-600 text-white shadow-sm hover:bg-indigo-700' : 'text-slate-500 hover:bg-slate-200/50'}`}
+                                            >
+                                                Appointment
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Clinical Unit Path</label>
-                                        <Select value={formData.departmentId} onValueChange={(v) => setFormData({ ...formData, departmentId: v })}>
-                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500">
-                                                <SelectValue placeholder="Select Department" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {departments.map(d => <SelectItem key={d.id} value={d.id.toString()} className="font-semibold text-sm">{d.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Select Department</label>
+                                        <Controller
+                                            name="departmentId"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                    <SelectTrigger className={`w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500 ${errors.departmentId ? 'border-rose-500' : ''}`}>
+                                                        <SelectValue placeholder="Select Department" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {departments.map(d => <SelectItem key={d.id} value={d.id.toString()} className="font-semibold text-sm">{d.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.departmentId && <p className="text-[10px] text-rose-500 font-medium">{String(errors.departmentId.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Assigned Consultant</label>
-                                        <Select value={formData.doctorId} onValueChange={(v) => setFormData({ ...formData, doctorId: v })}>
-                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500">
-                                                <SelectValue placeholder="System Assign" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {doctors.map(d => <SelectItem key={d.id} value={d.id.toString()} className="font-semibold text-sm">{d.name}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Select Doctor</label>
+                                        <Controller
+                                            name="doctorId"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value || ''}>
+                                                    <SelectTrigger className={`w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500 ${errors.doctorId ? 'border-rose-500' : ''}`}>
+                                                        <SelectValue placeholder="System Assign" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {doctors.map(d => <SelectItem key={d.id} value={d.id.toString()} className="font-semibold text-sm">{d.name}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.doctorId && <p className="text-[10px] text-rose-500 font-medium">{String(errors.doctorId.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Service Classification</label>
-                                        <Select value={formData.visitType} onValueChange={(v) => setFormData({ ...formData, visitType: v })}>
-                                            <SelectTrigger className="w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Consultation" className="font-semibold text-sm">Consultation</SelectItem>
-                                                <SelectItem value="Follow-up" className="font-semibold text-sm">Follow-up</SelectItem>
-                                                <SelectItem value="Procedure" className="font-semibold text-sm">Procedure</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Visit Type</label>
+                                        <Controller
+                                            name="visitType"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <SelectTrigger className={`w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500 ${errors.visitType ? 'border-rose-500' : ''}`}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Consultation" className="font-semibold text-sm">Consultation</SelectItem>
+                                                        <SelectItem value="Follow-up" className="font-semibold text-sm">Follow-up</SelectItem>
+                                                        <SelectItem value="Procedure" className="font-semibold text-sm">Procedure</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.visitType && <p className="text-[10px] text-rose-500 font-medium">{String(errors.visitType.message)}</p>}
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase text-slate-500 tracking-wider">Triage Priority</label>
-                                        <Select value={formData.priority} onValueChange={(v) => setFormData({ ...formData, priority: v })}>
-                                            <SelectTrigger className={`w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500 ${formData.priority === 'Urgent' ? 'text-red-600 border-red-200 bg-red-50' : ''}`}>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Normal" className="font-semibold text-sm">Normal</SelectItem>
-                                                <SelectItem value="Urgent" className="font-semibold text-sm text-red-600">Urgent</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <label className="text-xs font-semibold text-[11px] tracking-wide">Priority</label>
+                                        <Controller
+                                            name="priority"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value}>
+                                                    <SelectTrigger className={`w-full bg-slate-50 border-slate-200 font-semibold text-slate-900 rounded-xl focus:ring-indigo-500 ${field.value === 'Urgent' ? 'text-red-600 border-red-200 bg-red-50' : ''}`}>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Normal" className="font-semibold text-sm">Normal</SelectItem>
+                                                        <SelectItem value="Urgent" className="font-semibold text-sm text-red-600">Urgent</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.priority && <p className="text-[10px] text-rose-500 font-medium">{String(errors.priority.message)}</p>}
                                     </div>
                                 </div>
 
                                 <DialogFooter className="pt-6 border-t border-slate-100">
-                                    <Button type="button" variant="outline" onClick={() => setShowRegisterModal(false)} className="rounded-xl font-bold uppercase tracking-wider text-xs">Cancel</Button>
-                                    <Button type="submit" className="rounded-xl font-bold uppercase tracking-wider text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-8">
-                                        Commit Record & Push
+                                    <Button type="button" variant="outline" onClick={() => setShowRegisterModal(false)} className="rounded-xl font-semibold tracking-wider text-xs">Cancel</Button>
+                                    <Button type="submit" disabled={isSubmitting} className="rounded-xl font-semibold tracking-wider text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-8">
+                                        {isSubmitting ? 'Registering...' : 'Register Patient'}
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -265,16 +370,16 @@ const ReceptionistAppointments = () => {
             {/* Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                 {[
-                    { label: 'Pending Wait', value: appointments.filter(a => ['Registered', 'Waiting'].includes(a.status)).length, color: 'text-indigo-600', icon: <Clock /> },
-                    { label: 'Active Session', value: appointments.filter(a => a.status === 'With Doctor').length, color: 'text-emerald-600', icon: <UserCheck /> },
-                    { label: 'Operational Unit', value: appointments.filter(a => a.status === 'Procedure').length, color: 'text-purple-600', icon: <MapPin /> },
-                    { label: 'Revenue/Billing', value: appointments.filter(a => a.status === 'Billing').length, color: 'text-amber-600', icon: <Activity /> },
-                    { label: 'Closed Ledger', value: appointments.filter(a => a.status === 'Closed').length, color: 'text-slate-400', icon: <Calendar /> },
+                    { label: 'Waiting List', value: appointments.filter(a => ['Registered', 'Waiting'].includes(a.status)).length, color: 'text-indigo-600', icon: <Clock /> },
+                    { label: 'With Doctor', value: appointments.filter(a => a.status === 'With Doctor').length, color: 'text-emerald-600', icon: <UserCheck /> },
+                    { label: 'In Procedure', value: appointments.filter(a => a.status === 'Procedure').length, color: 'text-purple-600', icon: <MapPin /> },
+                    { label: 'In Billing', value: appointments.filter(a => a.status === 'Billing').length, color: 'text-amber-600', icon: <Activity /> },
+                    { label: 'Completed', value: appointments.filter(a => a.status === 'Closed').length, color: 'text-slate-400', icon: <Calendar /> },
                 ].map((stat, i) => (
                     <Card key={i} className="rounded-xl border border-slate-50 shadow-sm relative overflow-hidden group transition-all duration-300 hover:shadow-md">
                         <CardContent className="p-8">
                             <div className="flex justify-between items-start mb-4">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+                                <p className="text-[10px] font-semibold text-slate-400 tracking-wider font-medium">{stat.label}</p>
                                 <div className={`${stat.color} opacity-20 group-hover:opacity-100 transition-opacity`}>{stat.icon}</div>
                             </div>
                             <p className={`text-4xl font-bold tracking-tight ${stat.color}`}>{stat.value}</p>
@@ -304,11 +409,11 @@ const ReceptionistAppointments = () => {
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-slate-50 border-b border-slate-200">
-                                    <TableHead className="px-6 py-3 text-slate-500 text-xs font-semibold uppercase tracking-wider w-24">Token</TableHead>
-                                    <TableHead className="px-6 py-3 text-slate-500 text-xs font-semibold uppercase tracking-wider">Patient Details</TableHead>
-                                    <TableHead className="px-6 py-3 text-slate-500 text-xs font-semibold uppercase tracking-wider">Department</TableHead>
-                                    <TableHead className="px-6 py-3 text-slate-500 text-xs font-semibold uppercase tracking-wider">Status</TableHead>
-                                    <TableHead className="px-6 py-3 text-right text-slate-500 text-xs font-semibold uppercase tracking-wider">Actions</TableHead>
+                                    <TableHead className="px-6 py-3 text-slate-500 text-[11px] font-semibold tracking-wide w-24">Token</TableHead>
+                                    <TableHead className="px-6 py-3 text-slate-500 text-[11px] font-semibold tracking-wide">Patient Details</TableHead>
+                                    <TableHead className="px-6 py-3 text-slate-500 text-[11px] font-semibold tracking-wide">Department</TableHead>
+                                    <TableHead className="px-6 py-3 text-slate-500 text-[11px] font-semibold tracking-wide">Status</TableHead>
+                                    <TableHead className="px-6 py-3 text-right text-slate-500 text-xs font-semibold tracking-wider">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -321,7 +426,11 @@ const ReceptionistAppointments = () => {
                                     <TableRow key={appt.id} className="hover:bg-slate-50/50 transition-colors group">
                                         <TableCell className="px-6 py-4">
                                             <div className="relative">
-                                                <div className="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg shadow-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                <div
+                                                    onClick={() => updateToken(appt.id, appt.token)}
+                                                    className="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-lg shadow-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-colors cursor-pointer"
+                                                    title="Click to re-assign token"
+                                                >
                                                     #{appt.token}
                                                 </div>
                                                 {appt.priority === 'Urgent' && (
@@ -383,6 +492,17 @@ const ReceptionistAppointments = () => {
                                                         ))}
                                                     </SelectContent>
                                                 </Select>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        setDeleteId(appt.id);
+                                                        setShowDeleteDialog(true);
+                                                    }}
+                                                    className="h-9 w-9 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </Button>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -394,8 +514,7 @@ const ReceptionistAppointments = () => {
                                                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
                                                     <Search size={24} className="text-slate-300" />
                                                 </div>
-                                                <h3 className="text-sm font-semibold text-slate-600">No appointments found</h3>
-                                                <p className="text-sm text-slate-400 mt-1">Try adjusting your search criteria</p>
+                                                <p className="text-sm font-semibold text-slate-500">Queue is neutralized • No waiting patients</p>
                                             </div>
                                         </TableCell>
                                     </TableRow>
@@ -405,6 +524,36 @@ const ReceptionistAppointments = () => {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <DialogContent className="max-w-md border-none shadow-2xl rounded-2xl p-0 overflow-hidden bg-white">
+                    <div className="p-8 text-center">
+                        <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-6 border border-rose-100 shadow-inner">
+                            <Trash2 size={32} className="text-rose-500 animate-pulse" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-slate-800 mb-2">Cancel Appointment</h3>
+                        <p className="text-slate-500 text-sm font-medium leading-relaxed px-4">
+                            You are about to cancel this appointment. This action cannot be undone. Are you sure you want to proceed?
+                        </p>
+                    </div>
+                    <div className="bg-slate-50 p-6 flex gap-3 border-t border-slate-100">
+                        <Button
+                            variant="ghost"
+                            onClick={() => setShowDeleteDialog(false)}
+                            className="flex-1 rounded-xl font-semibold tracking-wider text-[10px] text-slate-500 hover:bg-white hover:text-slate-900 border border-slate-200 uppercase"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={deleteAppointment}
+                            className="flex-1 rounded-xl font-semibold tracking-wider text-[10px] bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-200 uppercase"
+                        >
+                            Confirm Deletion
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

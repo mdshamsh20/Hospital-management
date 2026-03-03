@@ -11,16 +11,15 @@ router.get('/dashboard-stats', async (req, res) => {
 
   try {
     const [
-      appointmentsToday,
+      appointmentsTodayCount,
       waitingQueue,
-      reportsReady,
-      dentalFollowUps,
+      reportsReadyCount,
+      dentalFollowUpsCount,
       doctors,
       delayedCount
     ] = await Promise.all([
-      prisma.appointment.findMany({
-        where: { date: today },
-        include: { patient: true }
+      prisma.appointment.count({
+        where: { date: today }
       }),
       prisma.appointment.findMany({
         where: { 
@@ -30,10 +29,10 @@ router.get('/dashboard-stats', async (req, res) => {
         include: { patient: true },
         orderBy: { token: 'asc' }
       }),
-      (prisma.radiologyCase as any).findMany({
-        where: { status: 'Completed' }
+      prisma.medicalReport.count({
+        where: { status: 'Final' }
       }),
-      (prisma.dentalLabOrder as any).findMany({
+      (prisma.dentalLabOrder as any).count({
         where: { 
           status: { in: ['Ready for Fit', 'Fabrication Scheduled'] },
           expectedReturn: { lte: new Date(today.getTime() + 24 * 60 * 60 * 1000) }
@@ -50,43 +49,15 @@ router.get('/dashboard-stats', async (req, res) => {
     ]);
 
     res.json({
-      appointmentsToday,
+      appointmentsToday: { length: appointmentsTodayCount },
       waitingQueue,
-      reportsReady,
-      dentalFollowUps,
+      reportsReady: { length: reportsReadyCount },
+      dentalFollowUps: { length: dentalFollowUpsCount },
       doctors,
       delayedCount
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch receptionist stats' });
-  }
-});
-
-// Call Next Patient (Token Calling)
-router.post('/call-next', async (req, res) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  try {
-    // Find first patient in 'Waiting' status
-    const nextPatient = await prisma.appointment.findFirst({
-      where: { date: today, status: 'Waiting' },
-      orderBy: { token: 'asc' }
-    });
-
-    if (!nextPatient) {
-      return res.status(404).json({ message: 'No patients in waiting queue' });
-    }
-
-    // Update status to 'Calling' (which will eventually become 'With Doctor')
-    const updated = await prisma.appointment.update({
-      where: { id: nextPatient.id },
-      data: { status: 'Calling' }
-    });
-
-    res.json(updated);
-  } catch (error) {
-    res.status(500).json({ error: 'Token call failed' });
   }
 });
 
@@ -109,7 +80,7 @@ router.patch('/doctors/:id/availability', async (req, res) => {
 router.patch('/reports/:id/deliver', async (req, res) => {
   const { id } = req.params;
   try {
-    const updated = await (prisma.radiologyCase as any).update({
+    const updated = await prisma.medicalReport.update({
       where: { id: parseInt(id) },
       data: { status: 'Delivered' }
     });

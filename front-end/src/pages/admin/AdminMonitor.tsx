@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Activity, Clock, FlaskConical, Printer, Users, UserCheck, AlertTriangle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AdminMonitor = () => {
     const [monitorData, setMonitorData] = useState<any>(null);
@@ -14,8 +15,8 @@ const AdminMonitor = () => {
 
     const fetchMonitorData = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/admin/dashboard-monitor');
-            setMonitorData(res.data);
+            const data: any = await api.get('/admin/dashboard-monitor');
+            setMonitorData(data);
         } catch (err) {
             console.error('Monitor fetch failed');
         } finally {
@@ -23,13 +24,36 @@ const AdminMonitor = () => {
         }
     };
 
-    if (loading || !monitorData) return <div className="p-10 text-center font-black uppercase tracking-[0.2em] text-slate-400">Loading Clinic Monitor...</div>;
+    if (loading || !monitorData) {
+        return (
+            <div className="space-y-6 pb-8">
+                <div className="flex justify-between items-center">
+                    <div>
+                        <Skeleton className="h-9 w-64" />
+                        <Skeleton className="h-4 w-96 mt-2" />
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                        <Skeleton key={i} className="h-32 rounded-xl" />
+                    ))}
+                </div>
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm h-[400px]">
+                    <Skeleton className="h-full w-full rounded-xl" />
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Skeleton className="h-[400px] rounded-xl" />
+                    <Skeleton className="h-[400px] rounded-xl" />
+                </div>
+            </div>
+        );
+    }
 
     const summaryCards = [
         { label: 'Live Queue', value: monitorData.waitingQueue.length, icon: <Users size={24} />, color: 'bg-blue-600', alert: monitorData.waitingQueue.length > 5 },
         { label: 'In Procedure', value: monitorData.inProcedure.length, icon: <UserCheck size={24} />, color: 'bg-indigo-600', alert: false },
-        { label: 'Reports Pending', value: monitorData.reportsPending.length, icon: <Printer size={24} />, color: 'bg-purple-600', alert: monitorData.reportsPending.length > 3 },
-        { label: 'Dental Lab', value: monitorData.dentalLabCases.length, icon: <FlaskConical size={24} />, color: 'bg-emerald-600', alert: false },
+        { label: 'Pending Review', value: monitorData.kpis.pendingReview, icon: <Printer size={24} />, color: 'bg-purple-600', alert: monitorData.kpis.pendingReview > 5 },
+        { label: 'Sample Revenue', value: `₹${monitorData.kpis.sampleRevenue}`, icon: <FlaskConical size={24} />, color: 'bg-emerald-600', alert: false },
     ];
 
     // Compute Department Bottlenecks
@@ -190,38 +214,37 @@ const AdminMonitor = () => {
                     </div>
                 </div>
 
-                {/* Radiology Delay Monitor */}
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                        <h2 className="text-base font-semibold text-slate-900 flex items-center">
-                            <Printer className="mr-2 text-indigo-600" size={18} />
-                            Radiology Processing
-                        </h2>
-                        <span className="text-xs font-medium text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">Render</span>
-                    </div>
-                    <div className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
-                        {monitorData.reportsPending.map((report: any) => (
-                            <div key={report.id} className="flex items-center justify-between p-4 rounded-lg bg-white border border-slate-200 shadow-sm hover:border-indigo-200 hover:shadow transition-all group">
-                                <div className="flex items-center space-x-4">
-                                    <div className="w-12 h-12 rounded-lg bg-white text-indigo-600 flex items-center justify-center font-bold text-xl border border-slate-200 shadow-sm">
-                                        R
-                                    </div>
-                                    <div>
-                                        <p className="font-semibold text-slate-900 text-sm">{report.patientName}</p>
-                                        <p className="text-xs text-slate-500 font-medium mt-1">{report.type} • {report.status}</p>
-                                    </div>
+                {/* Operations KPIs Detail */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col justify-between">
+                    <div>
+                        <div className="p-6 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                            <h2 className="text-base font-semibold text-slate-900 flex items-center">
+                                <Activity className="mr-2 text-indigo-600" size={18} />
+                                Daily Operations Goal
+                            </h2>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div>
+                                <div className="flex justify-between text-sm font-medium mb-2">
+                                    <span className="text-slate-600">Report Review Goal (Aim: 0 Pending)</span>
+                                    <span className="text-indigo-600 font-bold">{monitorData.kpis.pendingReview} Pending</span>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-xs font-medium text-slate-500 text-right">SLA limit</p>
-                                    <p className="text-sm font-semibold text-indigo-600 mt-1">4 hrs</p>
+                                <div className="w-full bg-slate-100 rounded-full h-2.5">
+                                    <div className="bg-indigo-600 h-2.5 rounded-full" style={{ width: `${Math.min(100, Math.max(0, 100 - (monitorData.kpis.pendingReview * 10)))}%` }}></div>
                                 </div>
                             </div>
-                        ))}
-                        {monitorData.reportsPending.length === 0 && (
-                            <div className="text-center py-8 opacity-50">
-                                <p className="text-sm font-medium text-slate-500">All reports cleared</p>
+
+                            <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                                <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Finalized Reports</p>
+                                    <p className="text-2xl font-bold text-slate-900">{monitorData.kpis.finalizedToday}</p>
+                                </div>
+                                <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                                    <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Monthly Comm.</p>
+                                    <p className="text-2xl font-bold text-emerald-700">₹{monitorData.kpis.monthlyCommission.toLocaleString()}</p>
+                                </div>
                             </div>
-                        )}
+                        </div>
                     </div>
                 </div>
             </div>

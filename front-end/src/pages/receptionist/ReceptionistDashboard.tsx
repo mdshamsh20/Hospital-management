@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import {
     Activity, Calendar,
     UserPlus, Clock, FlaskConical,
@@ -26,11 +26,10 @@ const ReceptionistDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/reception/dashboard-stats');
-            setData(res.data);
+            const res = await api.get('/reception/dashboard-stats');
+            setData(res);
         } catch (err) {
-            console.error('Failed to fetch dashboard data');
-            toast.error("Connectivity issue: Failed to fetch live operational data.");
+            // Handled
         } finally {
             setLoading(false);
         }
@@ -39,11 +38,11 @@ const ReceptionistDashboard = () => {
     const callNextPatient = async () => {
         setCallingPatient(true);
         try {
-            await axios.post('http://localhost:8080/api/reception/call-next');
+            await api.post('/reception/call-next');
             await fetchData();
             toast.success("Token Announcement: Next patient summoned to desk.");
         } catch (err) {
-            toast.error("Operation Failed: Queue is currently empty.");
+            // Handled
         } finally {
             setCallingPatient(false);
         }
@@ -51,11 +50,24 @@ const ReceptionistDashboard = () => {
 
     const updateDocAvailability = async (id: number, availability: string) => {
         try {
-            await axios.patch(`http://localhost:8080/api/reception/doctors/${id}/availability`, { availability });
+            await api.patch(`/reception/doctors/${id}/availability`, { availability });
             await fetchData();
             toast.success(`Physician Status: Updated to ${availability}`);
         } catch (err) {
-            toast.error("System Error: Failed to update availability.");
+            // Handled
+        }
+    };
+
+    const updateToken = async (id: number, currentToken: number) => {
+        const newToken = prompt("Enter new Token Number:", currentToken.toString());
+        if (newToken === null || newToken === "" || isNaN(parseInt(newToken))) return;
+
+        try {
+            await api.patch(`/appointments/${id}/token`, { token: parseInt(newToken) });
+            await fetchData();
+            toast.success(`Token Sequence Adjusted: Now #${newToken}`);
+        } catch (err) {
+            // Handled
         }
     };
 
@@ -83,31 +95,31 @@ const ReceptionistDashboard = () => {
             {/* Top Bar - Enhanced with Token Display */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Reception Desk</h1>
-                    <div className="flex items-center mt-1">
-                        <span className="relative flex h-2.5 w-2.5 mr-2">
+                    <h1 className="text-3xl font-bold text-slate-800 tracking-tight leading-tight">Reception Desk</h1>
+                    <div className="flex items-center mt-1.5">
+                        <span className="relative flex h-2 w-2 mr-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                         </span>
-                        <p className="text-slate-500 text-sm font-medium">
+                        <p className="text-slate-500 text-sm font-semibold">
                             Live Operational Layer • {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center bg-white border border-slate-200 p-2 rounded-xl shadow-sm">
-                    <div className="px-6 py-2 bg-slate-50 rounded-lg mr-3 border border-slate-100 flex flex-col items-center">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Live Desk Token</p>
-                        <p className="text-xl font-bold text-slate-900 leading-none">#{data.waitingQueue?.[0]?.token || '--'}</p>
+                    <div className="px-5 py-2 bg-slate-50 rounded-lg mr-3 border border-slate-100 flex flex-col items-center">
+                        <p className="text-[10px] font-bold text-slate-500 tracking-wide mb-0.5">Live Desk Token</p>
+                        <p className="text-xl font-bold text-slate-800 leading-none">#{data.waitingQueue?.[0]?.token || '--'}</p>
                     </div>
                     <Button
                         onClick={callNextPatient}
                         disabled={callingPatient}
-                        className="h-11 bg-indigo-600 text-white px-6 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors shadow-sm"
+                        className="h-10 bg-indigo-600 text-white px-5 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors shadow-sm"
                     >
                         {callingPatient ? (
                             <div className="flex items-center gap-2">
-                                <RefreshCw className="animate-spin" size={16} />
+                                <RefreshCw className="animate-spin" size={15} />
                                 <span>Calling...</span>
                             </div>
                         ) : 'Call Next Patient'}
@@ -133,7 +145,7 @@ const ReceptionistDashboard = () => {
                         <div>
                             <p className="text-sm font-bold text-rose-900">Queue Saturation Alert</p>
                             <p className="text-xs font-medium text-rose-700 mt-0.5">
-                                <span className="font-bold">{data.delayedCount} Patients</span> waiting beyond operational threshold (&gt;20m).
+                                <span className="font-bold">{data.delayedCount} Patients</span> waiting beyond operational threshold.
                             </p>
                         </div>
                     </div>
@@ -183,17 +195,17 @@ const ReceptionistDashboard = () => {
                     <CardHeader className="p-6 border-b border-slate-100 bg-white">
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle className="text-lg font-bold text-slate-900 tracking-tight flex items-center">
-                                    <Activity className="mr-2 text-indigo-600" size={20} />
-                                    Live Performance Queue
+                                <CardTitle className="text-lg font-bold text-slate-800 tracking-tight flex items-center">
+                                    <Activity className="mr-2 text-indigo-600" size={18} />
+                                    Live performance queue
                                 </CardTitle>
-                                <p className="text-slate-500 text-xs font-medium mt-1 flex items-center">
+                                <p className="text-slate-500 text-xs font-semibold mt-1 flex items-center">
                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2"></span>
-                                    Real-time Operational Stream
+                                    Real-time operational stream
                                 </p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={fetchData} className="text-xs font-semibold text-slate-600 hover:text-indigo-600 transition h-9">
-                                Refresh Feed
+                            <Button variant="outline" size="sm" onClick={fetchData} className="text-xs font-semibold text-slate-600 hover:text-indigo-600 transition h-8">
+                                Refresh feed
                             </Button>
                         </div>
                     </CardHeader>
@@ -210,7 +222,11 @@ const ReceptionistDashboard = () => {
                                 data.waitingQueue.slice(0, 4).map((appt: any) => (
                                     <div key={appt.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50 hover:bg-slate-100/50 border border-slate-100 transition-colors shadow-sm animate-in slide-in-from-bottom-2">
                                         <div className="flex items-center space-x-4">
-                                            <div className="w-12 h-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                                            <div
+                                                onClick={() => updateToken(appt.id, appt.token)}
+                                                className="w-12 h-12 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-sm cursor-pointer hover:bg-indigo-700 transition-colors"
+                                                title="Click to edit token"
+                                            >
                                                 {appt.token}
                                             </div>
                                             <div>

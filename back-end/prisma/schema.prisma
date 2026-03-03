@@ -34,17 +34,25 @@ model Appointment {
   patient      Patient?  @relation(fields: [patientId], references: [id])
   department   Department? @relation(fields: [departmentId], references: [id])
   doctor       Doctor?     @relation(fields: [doctorId], references: [id])
+  diagnosticOrders DiagnosticOrder[]
+  
+  @@index([date])
+  @@index([patientId])
+  @@index([status])
 }
 
 model Patient {
-  id           Int           @id @default(autoincrement())
-  name         String
-  age          Int?
-  gender       String?
-  phone        String?       @unique
-  address      String?
-  appointments Appointment[]
-  createdAt    DateTime      @default(now())
+  id            Int           @id @default(autoincrement())
+  name          String
+  age           Int?
+  gender        String?
+  phone         String?       @unique
+  address       String?
+  appointments  Appointment[]
+  diagnosticOrders DiagnosticOrder[]
+  medicalReports   MedicalReport[]
+  treatmentPlans   DentalTreatmentPlan[]
+  createdAt     DateTime      @default(now())
 }
 
 model Doctor {
@@ -72,10 +80,18 @@ model Inquiry {
   status  Boolean?
 }
 
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  RECEPTIONIST
+  DOCTOR
+}
+
 model Users {
   id       Int     @id @default(autoincrement())
   email    String? @unique
   password String?
+  role     Role    @default(RECEPTIONIST)
 }
 
 model Staff {
@@ -165,20 +181,108 @@ model Expense {
   description String?
   amount      Float
   date        DateTime @default(now())
+
+  @@index([date])
 }
 
-model RadiologyCase {
-  id             Int      @id @default(autoincrement())
-  patientName    String
-  type           String   
-  status         String   @default("Pending") 
+model DiagnosticOrder {
+  id             Int           @id @default(autoincrement())
+  patientId      Int
+  appointmentId  Int?
+  type           String        // X-Ray, Ultrasound
+  testName       String?       
+  status         String        @default("Pending") // Pending, In Progress, Completed, Cancelled
+  priority       String        @default("Normal")
   technicianName String?
-  approvedBy     String?   
-  date           DateTime @default(now())
-  testDoneAt     DateTime?
-  typedAt        DateTime?
-  deliveredAt    DateTime?
-  cost           Float    @default(0)
+  notes          String?       
+  cost           Float         @default(0)
+  createdAt      DateTime      @default(now())
+  report         MedicalReport?
+  patient        Patient       @relation(fields: [patientId], references: [id])
+  appointment    Appointment?  @relation(fields: [appointmentId], references: [id])
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MedicalReport {
+  id              Int             @id @default(autoincrement())
+  orderId         Int?            @unique
+  patientId       Int
+  serviceType     String          // Dental, X-Ray, Ultrasound, Consultation
+  findings        String?
+  impression      String?
+  recommendations String?
+  images          String[]        
+  status          String          @default("Draft") // Draft, Under Review, Final, Delivered
+  pdfUrl          String?
+  finalizedAt     DateTime?
+  finalizedBy     String?
+  createdAt       DateTime        @default(now())
+  order           DiagnosticOrder? @relation(fields: [orderId], references: [id])
+  patient         Patient          @relation(fields: [patientId], references: [id])
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model DentalTreatmentPlan {
+  id             Int             @id @default(autoincrement())
+  patientId      Int
+  patientName    String
+  primaryConcern String?
+  totalStages    Int             @default(1)
+  status         String          @default("Active") // Active, Completed, Dropped
+  createdAt      DateTime        @default(now())
+  sittings       DentalSitting[]
+  patient        Patient         @relation(fields: [patientId], references: [id])
+}
+
+model DentalSitting {
+  id              Int                 @id @default(autoincrement())
+  planId          Int
+  sittingNumber   Int
+  procedureDone   String?
+  toothNumber     String?
+  materialUsed    String?
+  notes           String?
+  status          String              @default("Pending") // Pending, Completed
+  date            DateTime            @default(now())
+  treatmentPlan   DentalTreatmentPlan @relation(fields: [planId], references: [id])
+}
+
+model SampleCollection {
+  id              Int      @id @default(autoincrement())
+  patientName     String
+  sampleType      String
+  sampleId        String   @unique
+  collectionDate  DateTime @default(now())
+  externalLab     String?
+  collectedBy     String?
+  amountCollected Float    @default(0)
+  labPayment      Float    @default(0)
+  margin          Float    @default(0)
+  status          String   @default("Collected") // Collected, Sent to Lab, Partner Received, Result Uploaded
+  paymentStatus   String   @default("Pending")   // Pending, Paid, Mismatched
+  notes           String?
+
+  @@index([collectionDate])
+  @@index([status])
+}
+
+model CommissionRecord {
+  id            Int      @id @default(autoincrement())
+  appointmentId Int?     @unique
+  doctorName    String   // Referring or Consultant
+  patientName   String
+  totalBilling  Float
+  commissionAmount Float
+  percentage    Float
+  type          String   // Referral, Consultation
+  status        String   @default("Pending") // Pending, Approved, Paid
+  month         String   // e.g., "February 2026"
+  createdAt     DateTime @default(now())
+  approvedAt    DateTime?
 }
 
 model ClinicSettings {
@@ -189,6 +293,8 @@ model ClinicSettings {
   tokenResetRule  String   @default("Daily")
   defaultXrayFee  Float    @default(500)
   defaultUsgFee   Float    @default(1200)
+  referralComm    Float    @default(10) // Default 10%
+  doctorComm      Float    @default(60) // Default 60%
   labTurnaround   Int      @default(3)
   updatedAt       DateTime @updatedAt
 }

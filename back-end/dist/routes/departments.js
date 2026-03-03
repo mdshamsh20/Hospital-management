@@ -20,12 +20,12 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const departments = yield prismaClient_1.default.department.findMany();
     res.json(departments);
 }));
-router.post('/', auth_1.authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/', auth_1.authenticateToken, (0, auth_1.authorize)('SUPER_ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { name } = req.body;
     const dept = yield prismaClient_1.default.department.create({ data: { name } });
     res.json(dept);
 }));
-router.delete('/:id', auth_1.authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.delete('/:id', auth_1.authenticateToken, (0, auth_1.authorize)('SUPER_ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const id = Number(req.params.id);
     yield prismaClient_1.default.department.delete({ where: { id } });
     res.sendStatus(204);

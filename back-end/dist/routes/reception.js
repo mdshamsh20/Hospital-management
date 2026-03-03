@@ -34,8 +34,8 @@ router.get('/dashboard-stats', (req, res) => __awaiter(void 0, void 0, void 0, f
                 include: { patient: true },
                 orderBy: { token: 'asc' }
             }),
-            prismaClient_1.default.radiologyCase.findMany({
-                where: { status: 'Completed' }
+            prismaClient_1.default.medicalReport.findMany({
+                where: { status: 'Final' }
             }),
             prismaClient_1.default.dentalLabOrder.findMany({
                 where: {
@@ -108,7 +108,7 @@ router.patch('/doctors/:id/availability', (req, res) => __awaiter(void 0, void 0
 router.patch('/reports/:id/deliver', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     try {
-        const updated = yield prismaClient_1.default.radiologyCase.update({
+        const updated = yield prismaClient_1.default.medicalReport.update({
             where: { id: parseInt(id) },
             data: { status: 'Delivered' }
         });

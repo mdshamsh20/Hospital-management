@@ -20,11 +20,11 @@ router.get('/dashboard-stats', (req, res) => __awaiter(void 0, void 0, void 0, f
     try {
         const [patientsToday, radiologyToday, dentalToday, dentalOrdersInLab, staffPresent, pendingReports, completedAppointments, cancelledAppointments, allAppointments] = yield Promise.all([
             prisma.appointment.count({ where: { date: { gte: today } } }),
-            prisma.radiologyCase.count({ where: { date: { gte: today } } }),
+            prisma.diagnosticOrder.count({ where: { createdAt: { gte: today } } }),
             prisma.dentalCase.count({ where: { date: { gte: today } } }),
             prisma.dentalLabOrder.count({ where: { status: { in: ['Sent to Lab', 'In Fabrication'] } } }),
             prisma.attendance.count({ where: { date: { gte: today }, status: 'Present' } }),
-            prisma.radiologyCase.count({ where: { status: { in: ['Draft', 'Typing'] } } }),
+            prisma.medicalReport.count({ where: { status: { in: ['Draft', 'Under Review'] } } }),
             prisma.appointment.count({ where: { date: { gte: today }, status: { in: ['Completed', 'Closed'] } } }),
             prisma.appointment.count({ where: { date: { gte: today }, status: 'Cancelled' } }),
             prisma.appointment.findMany({ where: { date: { gte: today } } })
@@ -73,39 +73,53 @@ router.get('/financials', (req, res) => __awaiter(void 0, void 0, void 0, functi
                 where: { cost: { not: null } },
                 select: { cost: true, treatmentType: true, patientName: true, createdAt: true }
             }),
-            prisma.radiologyCase.count(),
+            prisma.diagnosticOrder.count(),
             prisma.dentalCase.count()
         ]);
+        const appointments = yield prisma.appointment.findMany({
+            where: { paymentStatus: 'Paid' },
+            include: { department: true, doctor: true }
+        });
+        const paidRadiology = yield prisma.diagnosticOrder.findMany({
+            where: { status: 'Completed' }
+        });
+        const appointmentRevenue = appointments.reduce((sum, apt) => sum + (apt.serviceCharge || 0), 0);
+        const radiologyRevenue = paidRadiology.reduce((sum, r) => sum + (r.cost || 0), 0);
         const baseExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
         const labExpenses = labCosts.reduce((sum, l) => sum + (l.cost || 0), 0);
         const totalExpenses = baseExpenses + labExpenses;
-        const totalRevenue = (radiologyCases * 500) + (dentalCases * 1000) + 120000; // Simplified calculation
+        const totalRevenue = appointmentRevenue + radiologyRevenue;
         const netProfit = totalRevenue - totalExpenses;
         const labExpenseEntries = labCosts.map((l, i) => ({
             id: `lab-${i}`,
             category: 'Dental Lab',
             description: `${l.treatmentType} - ${l.patientName}`,
-            amount: l.cost,
+            amount: l.cost || 0,
             date: l.createdAt
         }));
-        const doctors = yield prisma.doctor.findMany();
-        const departments = yield prisma.department.findMany();
-        const revenueByDepartment = departments.map((d, i) => ({
-            name: d.name,
-            value: Math.round(totalRevenue * (0.4 / departments.length)) + (i * 15000),
-            trend: '+5%'
-        }));
-        revenueByDepartment.push({ name: 'Walk-ins / General', value: Math.round(totalRevenue * 0.45), trend: '+12%' });
-        const revenueByDoctor = doctors.map((d, i) => ({
-            name: d.name,
-            specialization: d.specialization,
-            value: Math.round(totalRevenue * (0.6 / doctors.length)) + (i * 8000)
-        }));
+        // Dynamic grouping by department
+        const deptRevenueMap = {};
+        appointments.forEach((apt) => {
+            var _a;
+            const dName = ((_a = apt.department) === null || _a === void 0 ? void 0 : _a.name) || 'General';
+            deptRevenueMap[dName] = (deptRevenueMap[dName] || 0) + (apt.serviceCharge || 0);
+        });
+        const revenueByDepartment = Object.entries(deptRevenueMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+        // Dynamic grouping by doctor
+        const docRevenueMap = {};
+        appointments.forEach((apt) => {
+            if (apt.doctor) {
+                const dName = apt.doctor.name || 'Unknown';
+                if (!docRevenueMap[dName]) {
+                    docRevenueMap[dName] = { name: dName, specialization: apt.doctor.specialization || 'General', value: 0 };
+                }
+                docRevenueMap[dName].value += (apt.serviceCharge || 0);
+            }
+        });
+        const revenueByDoctor = Object.values(docRevenueMap).sort((a, b) => b.value - a.value);
         const revenueByProcedure = [
-            { name: 'Radiology / Imaging', value: radiologyCases * 500 },
-            { name: 'Dental Surgeries', value: dentalCases * 1000 },
-            { name: 'General Consultation', value: 85000 },
-            { name: 'Specialist Consultation', value: 35000 }
+            { name: 'Radiology / Imaging', value: radiologyRevenue },
+            { name: 'Consultations & Procedures', value: appointmentRevenue }
         ].sort((a, b) => b.value - a.value);
         res.json({
             totalRevenue,
@@ -119,6 +133,211 @@ router.get('/financials', (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
     catch (error) {
         res.status(500).json({ error: 'Failed to fetch financial summary' });
+    }
+}));
+// Executive Summary for Super Admin
+router.get('/executive-summary', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    try {
+        const [
+        // Operations Block
+        patientsToday, newPatientsToday, pendingReportsCount, activeDoctorsCount, pendingReportsDetails, lowStockItems, 
+        // Sample Revenue
+        samplesCompleted, 
+        // Financial block - month
+        monthlyExpensesRecs, monthlyLabCosts, monthlyAppointments, monthlyCommissions, 
+        // Financial block - today
+        todayAppointments, todayExpensesRecs,] = yield Promise.all([
+            prisma.appointment.count({ where: { date: { gte: today } } }),
+            prisma.appointment.count({ where: { date: { gte: today }, patient: { appointments: { none: { date: { lt: today } } } } } }), // new vs repeat approximation
+            prisma.medicalReport.count({ where: { status: { in: ['Draft', 'Under Review'] } } }),
+            prisma.doctor.count({ where: { onDuty: true, availability: { in: ['Available', 'Busy'] } } }),
+            prisma.medicalReport.findMany({
+                where: { status: { in: ['Draft', 'Under Review'] } },
+                include: { patient: true },
+                take: 5,
+                orderBy: { createdAt: 'desc' }
+            }),
+            prisma.inventoryItem.findMany({
+                where: { stock: { lt: 10 } },
+                take: 5
+            }),
+            prisma.sampleCollection.findMany({ where: { collectionDate: { gte: startOfMonth } } }),
+            prisma.expense.findMany({ where: { date: { gte: startOfMonth } } }),
+            prisma.dentalLabOrder.findMany({ where: { createdAt: { gte: startOfMonth }, cost: { not: null } } }),
+            prisma.appointment.findMany({ where: { date: { gte: startOfMonth } }, include: { doctor: true } }),
+            prisma.commissionRecord.findMany({ where: { createdAt: { gte: startOfMonth } } }),
+            prisma.appointment.findMany({ where: { date: { gte: today } } }),
+            prisma.expense.findMany({ where: { date: { gte: today } } }),
+        ]);
+        // Financial KPI Calculations
+        const todayRevenue = todayAppointments.filter(a => a.paymentStatus === 'Paid').reduce((sum, a) => sum + (a.serviceCharge || 0), 0);
+        const monthlyRevenue = monthlyAppointments.filter(a => a.paymentStatus === 'Paid').reduce((sum, a) => sum + (a.serviceCharge || 0), 0);
+        const todayExpenses = todayExpensesRecs.reduce((sum, e) => sum + e.amount, 0);
+        const monthlyExpenses = monthlyExpensesRecs.reduce((sum, e) => sum + e.amount, 0) +
+            monthlyLabCosts.reduce((sum, e) => sum + (e.cost || 0), 0);
+        const outstandingPayments = monthlyAppointments.filter(a => a.paymentStatus === 'Pending').reduce((sum, a) => sum + (a.serviceCharge || 0), 0);
+        const netProfit = monthlyRevenue - monthlyExpenses;
+        // Operational KPI Block
+        const newVsRepeatRatio = patientsToday > 0 ? `${newPatientsToday}:${patientsToday - newPatientsToday}` : '1:0';
+        const sampleCollectionRevenue = samplesCompleted.reduce((sum, s) => sum + s.margin, 0);
+        // Commission Summary
+        const totalCommissionPayable = monthlyCommissions.filter(c => c.status === 'Pending').reduce((sum, c) => sum + c.commissionAmount, 0);
+        const commissionByDoctorMap = {};
+        monthlyCommissions.forEach(c => {
+            commissionByDoctorMap[c.doctorName] = (commissionByDoctorMap[c.doctorName] || 0) + c.commissionAmount;
+        });
+        const commissionByDoctor = Object.entries(commissionByDoctorMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+        res.json({
+            financials: {
+                todayRevenue,
+                monthlyRevenue,
+                totalExpenses: { today: todayExpenses, month: monthlyExpenses },
+                netProfit,
+                outstandingPayments
+            },
+            operations: {
+                activeDoctors: activeDoctorsCount,
+                patientsToday,
+                newVsRepeatRatio,
+                reportsPending: pendingReportsCount,
+                sampleCollectionRevenue,
+                alerts: {
+                    pendingReports: pendingReportsDetails.map(r => {
+                        var _a;
+                        return ({
+                            id: r.id,
+                            patient: (_a = r.patient) === null || _a === void 0 ? void 0 : _a.name,
+                            type: r.serviceType,
+                            date: r.createdAt
+                        });
+                    }),
+                    lowStock: lowStockItems.map(i => ({
+                        name: i.name,
+                        stock: i.stock,
+                        unit: i.unit
+                    }))
+                }
+            },
+            commissions: {
+                totalPayable: totalCommissionPayable,
+                byDoctor: commissionByDoctor
+            }
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to generate executive summary' });
+    }
+}));
+// Operations Admin Dashboard
+router.get('/operations-dashboard', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    try {
+        const [
+        // KPI Row
+        reportsPendingReview, reportsFinalizedToday, commissionsThisMonth, samplesToday, newPatientsToday, patientsToday, 
+        // Monitor Panel
+        activeDoctorsCount, waitingPatients, diagnosticOrdersPending, 
+        // Alerts
+        reportsPendingOver24h, unapprovedCommissions, mismatchedSamples, 
+        // New: Detailed performance
+        todayAppointmentsFull, activeDocsFull] = yield Promise.all([
+            prisma.medicalReport.count({ where: { status: { in: ['Draft', 'Under Review'] } } }),
+            prisma.medicalReport.count({ where: { status: 'Final', finalizedAt: { gte: today } } }),
+            prisma.commissionRecord.findMany({ where: { createdAt: { gte: startOfMonth } } }),
+            prisma.sampleCollection.findMany({ where: { collectionDate: { gte: today } } }),
+            prisma.appointment.count({ where: { date: { gte: today }, patient: { appointments: { none: { date: { lt: today } } } } } }),
+            prisma.appointment.count({ where: { date: { gte: today } } }),
+            prisma.doctor.count({ where: { onDuty: true, availability: { in: ['Available', 'Busy'] } } }),
+            prisma.appointment.count({ where: { date: { gte: today }, status: 'Waiting' } }),
+            prisma.diagnosticOrder.count({ where: { status: 'Pending' } }),
+            prisma.medicalReport.findMany({
+                where: { status: { in: ['Draft', 'Under Review'] }, createdAt: { lt: yesterday } },
+                select: { id: true, serviceType: true, createdAt: true, patient: { select: { name: true } } }
+            }),
+            prisma.commissionRecord.findMany({
+                where: { status: 'Pending' },
+                select: { id: true, doctorName: true, commissionAmount: true, createdAt: true }
+            }),
+            prisma.sampleCollection.findMany({
+                where: { margin: { lt: 0 } },
+                select: { id: true, patientName: true, sampleType: true, margin: true, amountCollected: true, labPayment: true }
+            }),
+            prisma.appointment.findMany({
+                where: { date: { gte: today } },
+                include: { department: true }
+            }),
+            prisma.doctor.findMany({
+                where: { onDuty: true }
+            })
+        ]);
+        const totalReferralCommission = commissionsThisMonth.reduce((sum, c) => sum + c.commissionAmount, 0);
+        const sampleCollectionRevenue = samplesToday.reduce((sum, s) => sum + (s.margin || 0), 0);
+        const newVsRepeat = patientsToday > 0 ? `${newPatientsToday}:${patientsToday - newPatientsToday}` : '1:0';
+        // Billing Summary
+        const paidAppointments = todayAppointmentsFull.filter(a => a.paymentStatus === 'Paid');
+        const totalToday = paidAppointments.reduce((sum, a) => sum + (a.serviceCharge || 0), 0);
+        // Mock payment modes since there's no paymentMode field in DB
+        const modes = [
+            { name: 'Cash', amount: Math.round(totalToday * 0.6) },
+            { name: 'Card/UPI', amount: totalToday - Math.round(totalToday * 0.6) }
+        ].filter(m => m.amount > 0);
+        // Group service revenue
+        const typeCounts = paidAppointments.reduce((acc, a) => {
+            var _a;
+            const type = ((_a = a.department) === null || _a === void 0 ? void 0 : _a.name) || 'General Consultation';
+            acc[type] = (acc[type] || 0) + (a.serviceCharge || 0);
+            return acc;
+        }, {});
+        const services = Object.keys(typeCounts).map(name => ({ name, amount: typeCounts[name] }));
+        // Doctor Performance
+        const doctorPerformance = activeDocsFull.map(doc => {
+            const docApps = todayAppointmentsFull.filter(a => a.doctorId === doc.id);
+            const referrals = commissionsThisMonth.filter(c => c.doctorName === doc.name && c.createdAt >= today).length;
+            return {
+                name: `Dr. ${doc.name}`,
+                department: doc.specialization || 'General',
+                patientsToday: docApps.length,
+                referralsGenerated: referrals,
+                pendingReports: 0 // Mocked for now
+            };
+        }).sort((a, b) => b.patientsToday - a.patientsToday);
+        res.json({
+            kpis: {
+                reportsPendingReview,
+                reportsFinalizedToday,
+                totalReferralCommission,
+                sampleCollectionRevenue,
+                newVsRepeat
+            },
+            monitor: {
+                activeDoctors: activeDoctorsCount,
+                waitingPatients,
+                diagnosticOrdersPending,
+                reportsUnderReview: reportsPendingReview
+            },
+            alerts: {
+                reportsPendingOver24h: reportsPendingOver24h.map(r => { var _a; return ({ id: r.id, patient: (_a = r.patient) === null || _a === void 0 ? void 0 : _a.name, type: r.serviceType, date: r.createdAt }); }),
+                unapprovedCommissions: unapprovedCommissions.map(c => ({ id: c.id, doctor: c.doctorName, amount: c.commissionAmount, date: c.createdAt })),
+                mismatchedSamples: mismatchedSamples.map(s => ({ id: s.id, patient: s.patientName, test: s.sampleType, margin: s.margin, collected: s.amountCollected, labCost: s.labPayment }))
+            },
+            billing: {
+                totalToday,
+                transactionsCount: paidAppointments.length,
+                modes,
+                services
+            },
+            doctorPerformance
+        });
+    }
+    catch (error) {
+        res.status(500).json({ error: 'Failed to generate operations dashboard data' });
     }
 }));
 exports.default = router;

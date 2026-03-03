@@ -13,7 +13,7 @@ const Footer = () => {
                             <div className="bg-primary-600 p-2 rounded-lg text-white inline-block">
                                 <Activity className="w-6 h-6" />
                             </div>
-                            <span className="text-2xl font-bold text-white tracking-tight">MediCare<span className="text-primary-500">.</span></span>
+                            <span className="text-2xl font-semibold text-white tracking-tight">MediCare<span className="text-primary-500">.</span></span>
                         </Link>
                         <p className="text-sm leading-relaxed text-slate-400 mt-4">
                             Providing world-class healthcare services with state-of-the-art facilities and expert medical professionals dedicated to your well-being.
@@ -28,7 +28,7 @@ const Footer = () => {
 
                     {/* Quick Links */}
                     <div>
-                        <h3 className="text-white text-lg font-bold mb-6">Quick Links</h3>
+                        <h3 className="text-white text-lg font-semibold mb-6">Quick Links</h3>
                         <ul className="space-y-3">
                             {['About Us', 'Services', 'Find a Doctor', 'Book Appointment', 'Contact Us'].map((link) => (
                                 <li key={link}>
@@ -42,7 +42,7 @@ const Footer = () => {
 
                     {/* Departments */}
                     <div>
-                        <h3 className="text-white text-lg font-bold mb-6">Departments</h3>
+                        <h3 className="text-white text-lg font-semibold mb-6">Departments</h3>
                         <ul className="space-y-3">
                             {['Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Dental Care'].map((dept) => (
                                 <li key={dept}>
@@ -56,7 +56,7 @@ const Footer = () => {
 
                     {/* Contact info */}
                     <div>
-                        <h3 className="text-white text-lg font-bold mb-6">Contact Info</h3>
+                        <h3 className="text-white text-lg font-semibold mb-6">Contact Info</h3>
                         <ul className="space-y-4">
                             <li className="flex items-start">
                                 <MapPin className="w-5 h-5 text-primary-500 mr-3 mt-1 flex-shrink-0" />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, Filter, AlertCircle, RefreshCw, MailOpen, Mail } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AdminInquiries = () => {
     const [inquiries, setInquiries] = useState<any[]>([]);
@@ -11,11 +12,10 @@ const AdminInquiries = () => {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.get('http://localhost:8080/api/inquiries');
-            setInquiries(res.data);
+            const data: any = await api.get('/inquiries');
+            setInquiries(data);
         } catch (err: any) {
-            console.error(err);
-            setError('Failed to fetch from API. Showing empty list.');
+            setError('Failed to fetch inquiries.');
             setInquiries([]);
         } finally {
             setLoading(false);
@@ -80,12 +80,21 @@ const AdminInquiries = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
-                                <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                                        <RefreshCw size={24} className="animate-spin mx-auto mb-2 opacity-50" />
-                                        Loading inquiries...
-                                    </td>
-                                </tr>
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4"><Skeleton className="h-4 w-4" /></td>
+                                        <td className="px-6 py-4">
+                                            <Skeleton className="h-4 w-32 mb-1" />
+                                            <Skeleton className="h-3 w-40" />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Skeleton className="h-4 w-48 mb-1" />
+                                            <Skeleton className="h-3 w-56" />
+                                        </td>
+                                        <td className="px-6 py-4"><Skeleton className="h-5 w-20 rounded" /></td>
+                                        <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                                    </tr>
+                                ))
                             ) : inquiries.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-12 text-center text-slate-500">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Activity, Zap } from 'lucide-react';
 
 const AdminAppointments = () => {
@@ -12,10 +12,10 @@ const AdminAppointments = () => {
 
     const fetchAuditData = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/admin/visits/audit');
-            setAppointments(res.data);
+            const data: any = await api.get('/admin/visits/audit');
+            setAppointments(data);
         } catch (err) {
-            console.error('Audit fetch failed');
+            // Handled
         }
     };
 
@@ -149,8 +149,8 @@ const AdminAppointments = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right align-top">
                                             <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm border ${apt.status === 'Completed' || apt.status === 'Closed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                    apt.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' :
-                                                        'bg-amber-50 text-amber-700 border-amber-200'
+                                                apt.status === 'Cancelled' ? 'bg-rose-50 text-rose-700 border-rose-200' :
+                                                    'bg-amber-50 text-amber-700 border-amber-200'
                                                 }`}>
                                                 {apt.status}
                                             </span>

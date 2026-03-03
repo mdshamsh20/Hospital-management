@@ -14,117 +14,95 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prismaClient_1 = __importDefault(require("../prismaClient"));
+const validate_1 = require("../middleware/validate");
+const inventory_1 = require("../validations/inventory");
 const router = (0, express_1.Router)();
 // Get all inventory items
 router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const items = yield prismaClient_1.default.inventoryItem.findMany({
-            include: {
-                purchases: {
-                    orderBy: { date: 'desc' },
-                    take: 5
-                },
-                consumptions: {
-                    orderBy: { date: 'desc' },
-                    take: 10
-                }
+    const items = yield prismaClient_1.default.inventoryItem.findMany({
+        include: {
+            purchases: {
+                orderBy: { date: 'desc' },
+                take: 5
+            },
+            consumptions: {
+                orderBy: { date: 'desc' },
+                take: 10
             }
-        });
-        res.json(items);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to fetch inventory' });
-    }
+        }
+    });
+    res.json(items);
 }));
 // Add inventory item
-router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, category, stock, unit } = req.body;
-    try {
-        const item = yield prismaClient_1.default.inventoryItem.create({
-            data: {
-                name,
-                category,
-                stock: parseInt(stock),
-                unit,
-            },
-        });
-        res.json(item);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to create inventory item' });
-    }
+router.post('/', (0, validate_1.validate)(inventory_1.createInventoryItemSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { name, category, stock, unit, expiryDate } = req.body;
+    const item = yield prismaClient_1.default.inventoryItem.create({
+        data: {
+            name,
+            category,
+            stock: parseInt(stock),
+            unit,
+            expiryDate: expiryDate ? new Date(expiryDate) : null,
+        },
+    });
+    res.json({ success: true, data: item });
 }));
 // Update stock (Inventory Adjustment)
 router.patch('/:id/stock', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { stock } = req.body;
-    try {
-        const item = yield prismaClient_1.default.inventoryItem.update({
-            where: { id: parseInt(id) },
-            data: {
-                stock: parseInt(stock),
-            },
-        });
-        res.json(item);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to update stock' });
-    }
+    const item = yield prismaClient_1.default.inventoryItem.update({
+        where: { id: parseInt(id) },
+        data: {
+            stock: parseInt(stock),
+        },
+    });
+    res.json({ success: true, data: item });
 }));
 // Record Purchase
-router.post('/purchases', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/purchases', (0, validate_1.validate)(inventory_1.purchaseRecordSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { itemId, quantity, cost, date } = req.body;
-    try {
-        const [purchase, updatedItem] = yield prismaClient_1.default.$transaction([
-            prismaClient_1.default.purchaseRecord.create({
-                data: {
-                    itemId: parseInt(itemId),
-                    quantity: parseInt(quantity),
-                    cost: parseFloat(cost),
-                    date: new Date(date),
-                },
-            }),
-            prismaClient_1.default.inventoryItem.update({
-                where: { id: parseInt(itemId) },
-                data: {
-                    stock: {
-                        increment: parseInt(quantity)
-                    }
+    const [purchase, updatedItem] = yield prismaClient_1.default.$transaction([
+        prismaClient_1.default.purchaseRecord.create({
+            data: {
+                itemId: parseInt(itemId),
+                quantity: parseInt(quantity),
+                cost: parseFloat(cost),
+                date: date ? new Date(date) : new Date(),
+            },
+        }),
+        prismaClient_1.default.inventoryItem.update({
+            where: { id: parseInt(itemId) },
+            data: {
+                stock: {
+                    increment: parseInt(quantity)
                 }
-            })
-        ]);
-        res.json({ purchase, updatedItem });
-    }
-    catch (error) {
-    }
+            }
+        })
+    ]);
+    res.json({ success: true, purchase, updatedItem });
 }));
 // Record Consumption (Usage)
-router.post('/consumptions', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/consumptions', (0, validate_1.validate)(inventory_1.consumptionRecordSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { itemId, quantity, usedFor, date } = req.body;
-    try {
-        const [consumption, updatedItem] = yield prismaClient_1.default.$transaction([
-            prismaClient_1.default.materialConsumption.create({
-                data: {
-                    itemId: parseInt(itemId),
-                    quantity: parseInt(quantity),
-                    usedFor,
-                    date: date ? new Date(date) : new Date(),
-                },
-            }),
-            prismaClient_1.default.inventoryItem.update({
-                where: { id: parseInt(itemId) },
-                data: {
-                    stock: {
-                        decrement: parseInt(quantity)
-                    }
+    const [consumption, updatedItem] = yield prismaClient_1.default.$transaction([
+        prismaClient_1.default.materialConsumption.create({
+            data: {
+                itemId: parseInt(itemId),
+                quantity: parseInt(quantity),
+                usedFor,
+                date: date ? new Date(date) : new Date(),
+            },
+        }),
+        prismaClient_1.default.inventoryItem.update({
+            where: { id: parseInt(itemId) },
+            data: {
+                stock: {
+                    decrement: parseInt(quantity)
                 }
-            })
-        ]);
-        res.json({ consumption, updatedItem });
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Failed to record consumption' });
-    }
+            }
+        })
+    ]);
+    res.json({ success: true, consumption, updatedItem });
 }));
 exports.default = router;

@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
+const auth_1 = require("../middleware/auth");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Get all expenses
@@ -26,7 +27,7 @@ router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 }));
 // Add expense
-router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/', (0, auth_1.authorize)('SUPER_ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { category, description, amount, date } = req.body;
     try {
         const expense = yield prisma.expense.create({
@@ -44,7 +45,7 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 }));
 // Delete expense
-router.delete('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.delete('/:id', (0, auth_1.authorize)('SUPER_ADMIN'), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     try {
         yield prisma.expense.delete({
