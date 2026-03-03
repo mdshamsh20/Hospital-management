@@ -11,66 +11,53 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("@prisma/client");
+const validate_1 = require("../middleware/validate");
+const staff_1 = require("../validations/staff");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
 // Get all staff
 router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const staff = yield prisma.staff.findMany({
-            include: {
-                attendance: {
-                    where: {
-                        date: {
-                            gte: new Date(new Date().setHours(0, 0, 0, 0)),
-                        },
+    const staff = yield prisma.staff.findMany({
+        include: {
+            attendance: {
+                where: {
+                    date: {
+                        gte: new Date(new Date().setHours(0, 0, 0, 0)),
                     },
                 },
             },
-        });
-        res.json(staff);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to fetch staff' });
-    }
+        },
+    });
+    res.json(staff);
 }));
 // Add staff
-router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/', (0, validate_1.validate)(staff_1.staffSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { name, role, contact, salary, joiningDate } = req.body;
-    try {
-        const staff = yield prisma.staff.create({
-            data: {
-                name,
-                role,
-                contact,
-                salary: parseFloat(salary),
-                joiningDate: new Date(joiningDate),
-            },
-        });
-        res.json(staff);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to create staff' });
-    }
+    const staff = yield prisma.staff.create({
+        data: {
+            name,
+            role,
+            contact,
+            salary: parseFloat(salary),
+            joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
+        },
+    });
+    res.json({ success: true, data: staff });
 }));
 // Update staff
-router.put('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.put('/:id', (0, validate_1.validate)(staff_1.staffSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { name, role, contact, salary } = req.body;
-    try {
-        const staff = yield prisma.staff.update({
-            where: { id: parseInt(id) },
-            data: {
-                name,
-                role,
-                contact,
-                salary: parseFloat(salary),
-            },
-        });
-        res.json(staff);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to update staff' });
-    }
+    const staff = yield prisma.staff.update({
+        where: { id: parseInt(id) },
+        data: {
+            name,
+            role,
+            contact,
+            salary: parseFloat(salary),
+        },
+    });
+    res.json({ success: true, data: staff });
 }));
 // Delete staff
 router.delete('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {

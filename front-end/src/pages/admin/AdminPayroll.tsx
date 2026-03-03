@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { IndianRupee, Users, Calendar, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from "sonner";
 
 const AdminPayroll = () => {
@@ -14,8 +15,8 @@ const AdminPayroll = () => {
 
     const fetchPayroll = async () => {
         try {
-            const res = await axios.get('http://localhost:8080/api/admin/payroll');
-            setPayrollData(res.data);
+            const data: any = await api.get('/admin/payroll');
+            setPayrollData(data);
         } catch (err) {
             console.error('Payroll fetch failed');
         } finally {
@@ -26,14 +27,14 @@ const AdminPayroll = () => {
     const processPayment = async (staff: any) => {
         setProcessingId(staff.id);
         try {
-            await axios.post('http://localhost:8080/api/admin/payroll/process', {
+            await api.post('/admin/payroll/process', {
                 staffId: staff.id,
                 amount: staff.payable
             });
             toast.success(`Payment processed for ${staff.name}`);
-            // In a real app, we'd update the status in the UI
+            fetchPayroll();
         } catch (err) {
-            toast.error("Failed to process payment");
+            // Handled
         } finally {
             setProcessingId(null);
         }
@@ -41,14 +42,14 @@ const AdminPayroll = () => {
 
     const processAllPayments = async () => {
         try {
-            await axios.post('http://localhost:8080/api/admin/payroll/process', {});
+            await api.post('/admin/payroll/process', {});
             toast.success("Bulk payment processing initialized");
+            fetchPayroll();
         } catch (err) {
-            toast.error("Failed to process bulk payments");
+            // Handled
         }
     };
 
-    if (loading) return <div className="p-10 text-center font-black uppercase tracking-[0.2em] text-slate-400">Calculating Payrolls...</div>;
 
     const totalPayable = payrollData.reduce((acc, curr) => acc + (curr.payable || 0), 0);
 
@@ -107,64 +108,84 @@ const AdminPayroll = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
-                                {payrollData.length === 0 ? (
+                                {loading ? (
+                                    Array.from({ length: 5 }).map((_, i) => (
+                                        <tr key={i}>
+                                            <td className="px-6 py-4"><Skeleton className="h-4 w-32" /></td>
+                                            <td className="px-6 py-4"><Skeleton className="h-4 w-24" /></td>
+                                            <td className="px-6 py-4"><Skeleton className="h-4 w-28" /></td>
+                                            <td className="px-6 py-4"><Skeleton className="h-4 w-16" /></td>
+                                            <td className="px-6 py-4"><Skeleton className="h-5 w-20 rounded" /></td>
+                                            <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-8 ml-auto rounded-full" /></td>
+                                        </tr>
+                                    ))
+                                ) : payrollData.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-sm text-slate-500">
                                             No payroll records found.
                                         </td>
                                     </tr>
-                                ) : null}
-                                {payrollData.map((staff) => (
-                                    <tr key={staff.id} className="hover:bg-slate-50 transition-colors group">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-bold text-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                                                    {staff.name.charAt(0)}
+                                ) : (
+                                    payrollData.map((staff) => (
+                                        <tr key={staff.id} className="hover:bg-slate-50 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-bold text-sm border border-indigo-100 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                                        {staff.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-900">{staff.name}</p>
+                                                        <p className="text-xs text-slate-500 font-medium">{staff.role}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-900">{staff.name}</p>
-                                                    <p className="text-xs text-slate-500 font-medium">{staff.role}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-medium text-slate-900">₹{staff.actualSalary?.toLocaleString()}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center space-x-2">
+                                                    <span className="text-sm font-medium text-slate-900">{staff.daysPresent}</span>
+                                                    <span className="text-xs text-slate-500 font-medium">/ 30</span>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="text-sm font-medium text-slate-900">₹{staff.actualSalary?.toLocaleString()}</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center space-x-2">
-                                                <span className="text-sm font-medium text-slate-900">{staff.daysPresent}</span>
-                                                <span className="text-xs text-slate-500 font-medium">/ 30</span>
-                                            </div>
-                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-1.5">
-                                                <div
-                                                    className="h-full bg-emerald-500 rounded-full"
-                                                    style={{ width: `${Math.min(100, (staff.daysPresent / 30) * 100)}%` }}
-                                                ></div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <p className="text-sm font-semibold text-emerald-600">₹{staff.payable.toLocaleString()}</p>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 text-xs font-medium border border-amber-200">
-                                                Ready for Payout
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => processPayment(staff)}
-                                                disabled={processingId === staff.id}
-                                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all disabled:opacity-50"
-                                            >
-                                                {processingId === staff.id ? (
-                                                    <Loader2 size={18} className="animate-spin" />
-                                                ) : (
-                                                    <CheckCircle2 size={18} />
-                                                )}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
+                                                <div className="w-16 h-1.5 bg-slate-100 rounded-full mt-1.5">
+                                                    <div
+                                                        className="h-full bg-emerald-500 rounded-full"
+                                                        style={{ width: `${Math.min(100, (staff.daysPresent / 30) * 100)}%` }}
+                                                    ></div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-semibold text-emerald-600">₹{staff.payable.toLocaleString()}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${staff.status === 'Paid'
+                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                                                    }`}>
+                                                    {staff.status === 'Paid' ? 'Paid' : 'Ready for Payout'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button
+                                                    onClick={() => processPayment(staff)}
+                                                    disabled={processingId === staff.id || staff.status === 'Paid'}
+                                                    className={`p-2 rounded-lg transition-all ${staff.status === 'Paid'
+                                                        ? 'text-emerald-600 bg-emerald-50 cursor-default'
+                                                        : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                                                        } disabled:opacity-50`}
+                                                >
+                                                    {processingId === staff.id ? (
+                                                        <Loader2 size={18} className="animate-spin" />
+                                                    ) : staff.status === 'Paid' ? (
+                                                        <CheckCircle2 size={18} />
+                                                    ) : (
+                                                        <ArrowRight size={18} />
+                                                    )}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>

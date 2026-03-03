@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, Printer, Activity, FileText, Share2, PackageCheck, Clock, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,11 +21,11 @@ const ReceptionistReportsDesk = () => {
     const fetchReports = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8080/api/reception/dashboard-stats');
-            setReports(res.data.reportsReady || []);
+            const data: any = await api.get('/reception/dashboard-stats');
+            setReports(data.reportsReady || []);
         } catch (err) {
             console.error('Failed to fetch reports');
-            toast.error("System Error: Failed to sync report dispatch queue.");
+            // Handled
         } finally {
             setLoading(false);
         }
@@ -33,11 +33,11 @@ const ReceptionistReportsDesk = () => {
 
     const markDelivered = async (id: number) => {
         try {
-            await axios.patch(`http://localhost:8080/api/reception/reports/${id}/deliver`);
+            await api.patch(`/reception/reports/${id}/deliver`);
             toast.success("Dispatch Confirmed: Report handed over successfully.");
             fetchReports();
         } catch (err) {
-            toast.error("Process Failed: Could not update delivery status.");
+            // Handled
         }
     };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, Phone, Calendar, Clock, CheckCircle2, FlaskConical, Filter, RefreshCw, Building2, UserCheck, Zap, ArrowRight, PackageOpen } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,20 +33,18 @@ const ReceptionistDentalFollowUps = () => {
     const fetchFollowUps = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8080/api/reception/dashboard-stats');
-            setOrders(res.data.dentalFollowUps || []);
+            const data: any = await api.get('/reception/dashboard-stats');
+            setOrders(data.dentalFollowUps || []);
         } catch (err) {
             console.error('Failed to fetch follow-ups');
-            toast.error("Telemetry Error", {
-                description: "Failed to sync with Laboratory Logistics Node."
-            });
+            // Handled
         } finally {
             setLoading(false);
         }
     };
 
     const updateAction = async (id: number, action: string) => {
-        const promise = axios.patch(`http://localhost:8080/api/reception/dental-orders/${id}/action`, { action });
+        const promise = api.patch(`/reception/dental-orders/${id}/action`, { action });
 
         toast.promise(promise, {
             loading: `Marking as ${action}...`,

@@ -1,66 +1,57 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 
+import { validate } from '../middleware/validate';
+import { staffSchema } from '../validations/staff';
+
 const router = Router();
 const prisma = new PrismaClient();
 
 // Get all staff
 router.get('/', async (req, res) => {
-  try {
-    const staff = await prisma.staff.findMany({
-      include: {
-        attendance: {
-          where: {
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)),
-            },
+  const staff = await prisma.staff.findMany({
+    include: {
+      attendance: {
+        where: {
+          date: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
           },
         },
       },
-    });
-    res.json(staff);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch staff' });
-  }
+    },
+  });
+  res.json(staff);
 });
 
 // Add staff
-router.post('/', async (req, res) => {
+router.post('/', validate(staffSchema), async (req, res) => {
   const { name, role, contact, salary, joiningDate } = req.body;
-  try {
-    const staff = await prisma.staff.create({
-      data: {
-        name,
-        role,
-        contact,
-        salary: parseFloat(salary),
-        joiningDate: new Date(joiningDate),
-      },
-    });
-    res.json(staff);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create staff' });
-  }
+  const staff = await prisma.staff.create({
+    data: {
+      name,
+      role,
+      contact,
+      salary: parseFloat(salary),
+      joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
+    },
+  });
+  res.json({ success: true, data: staff });
 });
 
 // Update staff
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate(staffSchema), async (req, res) => {
   const { id } = req.params;
   const { name, role, contact, salary } = req.body;
-  try {
-    const staff = await prisma.staff.update({
-      where: { id: parseInt(id) },
-      data: {
-        name,
-        role,
-        contact,
-        salary: parseFloat(salary),
-      },
-    });
-    res.json(staff);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update staff' });
-  }
+  const staff = await prisma.staff.update({
+    where: { id: parseInt(id as string) },
+    data: {
+      name,
+      role,
+      contact,
+      salary: parseFloat(salary),
+    },
+  });
+  res.json({ success: true, data: staff });
 });
 
 // Delete staff

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Zap, Info } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +16,12 @@ const ReceptionistCalendar = () => {
 
     const fetchAllEvents = async () => {
         try {
-            const [apptRes, dentalRes] = await Promise.all([
-                axios.get('http://localhost:8080/api/appointments'),
-                axios.get('http://localhost:8080/api/reception/dashboard-stats')
+            const [apptData, dentalData]: [any, any] = await Promise.all([
+                api.get('/appointments'),
+                api.get('/reception/dashboard-stats')
             ]);
 
-            const normalizedAppts = apptRes.data.map((a: any) => ({
+            const normalizedAppts = apptData.map((a: any) => ({
                 id: a.id,
                 date: a.date?.split('T')[0],
                 title: a.patient?.name || a.name,
@@ -29,7 +29,7 @@ const ReceptionistCalendar = () => {
                 status: a.status
             }));
 
-            const normalizedDental = (dentalRes.data.dentalFollowUps || []).map((d: any) => ({
+            const normalizedDental = (dentalData.dentalFollowUps || []).map((d: any) => ({
                 id: d.id,
                 date: d.expectedReturn?.split('T')[0],
                 title: `${d.patientName} (Dental)`,

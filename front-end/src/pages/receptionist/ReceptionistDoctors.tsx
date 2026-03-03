@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, RefreshCw, User, ShieldCheck } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ import {
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
 
 const ReceptionistDoctors = () => {
     const [doctors, setDoctors] = useState<any[]>([]);
@@ -24,13 +23,9 @@ const ReceptionistDoctors = () => {
     const fetchDoctors = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8080/api/doctors');
-            setDoctors(res.data);
+            const data: any = await api.get('/doctors');
+            setDoctors(data);
         } catch (err: any) {
-            console.error(err);
-            toast.error("Telemetry Error", {
-                description: "Failed to sync physician database with central node."
-            });
             setDoctors([]);
         } finally {
             setLoading(false);

@@ -1,41 +1,44 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ShieldAlert } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import api from '@/lib/api';
+import { ShieldAlert, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
+
+const loginSchema = z.object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 const AdminLogin = () => {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const [showPassword, setShowPassword] = useState(false);
+    const {
+        register,
+        handleSubmit,
+        formState: { errors, isSubmitting }
+    } = useForm<LoginForm>({
+        resolver: zodResolver(loginSchema),
+    });
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-
+    const onLoginSubmit = async (data: LoginForm) => {
         try {
-            // Uncomment the real API call when the backend uses it.
-            // Using a mock token for now to allow seamless showcase.
-            /*
-            const response = await axios.post('http://localhost:8080/api/auth/login', {
-                email,
-                password
-            });
-            localStorage.setItem('adminToken', response.data.token);
-            */
+            const response: any = await api.post('/auth/login', data);
 
-            // Temporary simple check for demo purposes
-            if (email === 'admin@medicare.com' && password === 'admin123') {
-                localStorage.setItem('adminToken', 'demo-token-123');
-                navigate('/admin');
-            } else {
-                setError('Invalid email or password. Use admin@medicare.com / admin123');
+            // Verify if the role is valid for this portal
+            if (response.user.role !== 'ADMIN') {
+                return toast.error("Access Denied: Please use the designated Executive Portal.");
             }
+
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('role', response.user.role.toLowerCase());
+            navigate('/admin');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed. Please try again.');
-        } finally {
-            setLoading(false);
+            // Handled by api interceptor
         }
     };
 
@@ -45,23 +48,17 @@ const AdminLogin = () => {
                 <div className="flex justify-center mb-6 text-indigo-600">
                     <ShieldAlert size={48} />
                 </div>
-                <h2 className="mt-6 text-center text-3xl font-extrabold text-slate-900">
-                    Admin Portal Login
+                <h2 className="mt-6 text-center text-2xl font-semibold text-slate-800 tracking-tight">
+                    Operations Portal
                 </h2>
                 <p className="mt-2 text-center text-sm text-slate-600">
-                    Sign in to manage appointments, doctors, and departments
+                    Clinic Management & Operations Hub
                 </p>
             </div>
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white py-8 px-4 shadow-xl border border-slate-100 sm:rounded-2xl sm:px-10">
-                    <form className="space-y-6" onSubmit={handleLogin}>
-                        {error && (
-                            <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm border border-red-100 flex items-center">
-                                {error}
-                            </div>
-                        )}
-
+                    <form className="space-y-6" onSubmit={handleSubmit(onLoginSubmit)}>
                         <div>
                             <label className="block text-sm font-medium text-slate-700">
                                 Email Address
@@ -72,13 +69,12 @@ const AdminLogin = () => {
                                 </div>
                                 <input
                                     type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="block w-full pl-10 px-4 py-3 sm:text-sm border border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
+                                    {...register('email')}
+                                    className={`block w-full pl-10 px-4 py-3 sm:text-sm border border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition ${errors.email ? 'border-rose-500' : ''}`}
                                     placeholder="admin@medicare.com"
                                 />
                             </div>
+                            {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
                         </div>
 
                         <div>
@@ -90,14 +86,20 @@ const AdminLogin = () => {
                                     <Lock className="h-5 w-5 text-slate-400" />
                                 </div>
                                 <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="block w-full pl-10 px-4 py-3 sm:text-sm border border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition"
+                                    type={showPassword ? 'text' : 'password'}
+                                    {...register('password')}
+                                    className={`block w-full pl-10 pr-10 px-4 py-3 sm:text-sm border border-slate-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50 focus:bg-white transition ${errors.password ? 'border-rose-500' : ''}`}
                                     placeholder="••••••••"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-indigo-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                                </button>
                             </div>
+                            {errors.password && <p className="mt-1 text-xs text-rose-500">{errors.password.message}</p>}
                         </div>
 
                         <div className="flex items-center justify-between">
@@ -116,10 +118,10 @@ const AdminLogin = () => {
                         <div>
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={isSubmitting}
                                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50"
                             >
-                                {loading ? 'Signing in...' : 'Sign In as Administrator'}
+                                {isSubmitting ? 'Signing in...' : 'Sign in as Owner / Super Admin'}
                             </button>
                         </div>
                     </form>

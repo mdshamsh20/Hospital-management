@@ -13,32 +13,7 @@ const express_1 = require("express");
 const client_1 = require("@prisma/client");
 const router = (0, express_1.Router)();
 const prisma = new client_1.PrismaClient();
-// Radiology Cases
-router.get('/radiology', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const cases = yield prisma.radiologyCase.findMany({
-            orderBy: { date: 'desc' },
-        });
-        res.json(cases);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to fetch radiology cases' });
-    }
-}));
-router.patch('/radiology/:id/status', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { id } = req.params;
-    const { status } = req.body; // Draft, Typing, Completed, Delivered
-    try {
-        const radiologyCase = yield prisma.radiologyCase.update({
-            where: { id: parseInt(id) },
-            data: { status },
-        });
-        res.json(radiologyCase);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to update radiology status' });
-    }
-}));
+// Deprecated: Radiology routes removed and handled by reports.ts
 // Dental Lab Orders (NEW)
 router.get('/lab-orders', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -117,4 +92,5 @@ router.post('/dental', (req, res) => __awaiter(void 0, void 0, void 0, function*
         res.status(500).json({ error: 'Failed to record dental case' });
     }
 }));
+// End of cases routes
 exports.default = router;

@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Calendar,
     Users,
-    Building2,
     MessageSquare,
     LogOut,
     Menu,
@@ -12,7 +11,6 @@ import {
     UserCircle,
     Activity,
     IndianRupee,
-    ClipboardList,
     Briefcase,
     Boxes,
     Stethoscope,
@@ -24,16 +22,19 @@ const AdminLayout = () => {
     const location = useLocation();
     const navigate = useNavigate();
 
-    // In a real app, you'd check authentication status here
-    // const isAuthenticated = localStorage.getItem('adminToken') !== null;
+    const isAuthenticated = localStorage.getItem('token') !== null;
+    const userRole = localStorage.getItem('role');
+    const isAuthorized = userRole === 'admin';
 
-    // In a real app, you'd redirect to login if not authenticated
-    // useEffect(() => {
-    //     if (!isAuthenticated) navigate('/admin/login');
-    // }, [isAuthenticated, navigate]);
+    useEffect(() => {
+        if (!isAuthenticated || !isAuthorized) {
+            navigate('/admin/login');
+        }
+    }, [isAuthenticated, isAuthorized, navigate]);
 
     const handleLogout = () => {
-        localStorage.removeItem('adminToken');
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
         navigate('/admin/login');
     };
 
@@ -41,19 +42,19 @@ const AdminLayout = () => {
         { path: '/admin', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
         { path: '/admin/monitor', icon: <Activity size={20} />, label: 'Operations Monitor' },
         { path: '/admin/appointments', icon: <Calendar size={20} />, label: 'Appointment Audit' },
+        { path: '/admin/samples', icon: <Boxes size={20} />, label: 'Sample Collection' },
+        { path: '/admin/commissions', icon: <IndianRupee size={20} />, label: 'Referral Commissions' },
+        { path: '/admin/reports', icon: <FileText size={20} />, label: 'Clinical Reports' },
         { path: '/admin/staff', icon: <Briefcase size={20} />, label: 'Staff & Attendance' },
-        { path: '/admin/payroll', icon: <IndianRupee size={20} />, label: 'Payroll summary' },
         { path: '/admin/inventory', icon: <Boxes size={20} />, label: 'Inventory & Usage' },
         { path: '/admin/expenses', icon: <IndianRupee size={20} />, label: 'Expenses' },
         { path: '/admin/radiology', icon: <Activity size={20} />, label: 'Radiology Control' },
         { path: '/admin/dental', icon: <Stethoscope size={20} />, label: 'Dental cases' },
-        { path: '/admin/financials', icon: <ClipboardList size={20} />, label: 'Financial Summary' },
-        { path: '/admin/reports', icon: <FileText size={20} />, label: 'Operational Reports' },
         { path: '/admin/doctors', icon: <Users size={20} />, label: 'Doctors' },
-        { path: '/admin/departments', icon: <Building2 size={20} />, label: 'Departments' },
-        { path: '/admin/settings', icon: <Menu size={20} />, label: 'Clinic Settings' },
         { path: '/admin/inquiries', icon: <MessageSquare size={20} />, label: 'Inquiries' },
     ];
+
+    const filteredNavItems = navItems;
 
     return (
         <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
@@ -72,7 +73,7 @@ const AdminLayout = () => {
             >
                 <div className="flex items-center justify-between h-20 px-6 bg-slate-950 shrink-0">
                     <span className="text-xl font-bold tracking-tight text-white flex items-center">
-                        <span className="text-primary-500 mr-2">Medi</span>Admin
+                        <span className="text-primary-500 mr-2">Operations</span>Panel
                     </span>
                     <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-white">
                         <X size={24} />
@@ -83,13 +84,13 @@ const AdminLayout = () => {
                     <div className="flex items-center space-x-3 mb-8 px-2 py-3 bg-slate-800 rounded-xl">
                         <UserCircle size={32} className="text-primary-400" />
                         <div>
-                            <p className="text-sm font-medium">Administrator</p>
-                            <p className="text-xs text-slate-400">admin@medicare.com</p>
+                            <p className="text-sm font-medium capitalize">{userRole?.replace('_', ' ') || 'Administrator'}</p>
+                            <p className="text-xs text-slate-400">{localStorage.getItem('email') || 'executive@medicare.com'}</p>
                         </div>
                     </div>
 
                     <nav className="space-y-1">
-                        {navItems.map((item) => {
+                        {filteredNavItems.map((item) => {
                             const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
                             return (
                                 <Link
@@ -131,8 +132,10 @@ const AdminLayout = () => {
                     </button>
 
                     <div className="flex items-center">
-                        <span className="text-sm font-medium text-slate-700 mr-4">Admin Portal</span>
-                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
+                        <span className="text-sm font-medium text-slate-700 mr-4 capitalize">
+                            Operations Portal
+                        </span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold bg-primary-600">
                             A
                         </div>
                     </div>

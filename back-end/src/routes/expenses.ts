@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { authorize } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -17,7 +18,7 @@ router.get('/', async (req, res) => {
 });
 
 // Add expense
-router.post('/', async (req, res) => {
+router.post('/', authorize('SUPER_ADMIN'), async (req, res) => {
   const { category, description, amount, date } = req.body;
   try {
     const expense = await prisma.expense.create({
@@ -35,11 +36,11 @@ router.post('/', async (req, res) => {
 });
 
 // Delete expense
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authorize('SUPER_ADMIN'), async (req, res) => {
   const { id } = req.params;
   try {
     await prisma.expense.delete({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(id as string) },
     });
     res.json({ message: 'Expense deleted successfully' });
   } catch (error) {

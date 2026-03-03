@@ -1,21 +1,21 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, Plus, RefreshCw, AlertCircle, Building2 } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AdminDepartments = () => {
     const [departments, setDepartments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
+    const [error, setError] = useState<string | null>(null);
 
     const fetchDepartments = async () => {
         setLoading(true);
-        setError('');
+        setError(null);
         try {
-            const res = await axios.get('http://localhost:8080/api/departments');
-            setDepartments(res.data);
+            const data: any = await api.get('/departments');
+            setDepartments(data);
         } catch (err: any) {
-            console.error(err);
-            setError('Failed to fetch from API. Showing empty list.');
+            setError(err.response?.data?.message || 'Failed to fetch departments');
             setDepartments([]);
         } finally {
             setLoading(false);
@@ -80,12 +80,13 @@ const AdminDepartments = () => {
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
-                                <tr>
-                                    <td colSpan={3} className="px-6 py-12 text-center text-sm text-slate-500">
-                                        <RefreshCw size={24} className="animate-spin mx-auto mb-3 text-slate-300" />
-                                        Loading departments...
-                                    </td>
-                                </tr>
+                                Array.from({ length: 4 }).map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4"><Skeleton className="h-4 w-8" /></td>
+                                        <td className="px-6 py-4"><Skeleton className="h-4 w-48" /></td>
+                                        <td className="px-6 py-4 text-right"><Skeleton className="h-8 w-24 ml-auto" /></td>
+                                    </tr>
+                                ))
                             ) : departments.length === 0 ? (
                                 <tr>
                                     <td colSpan={3} className="px-6 py-12 text-center text-sm text-slate-500">

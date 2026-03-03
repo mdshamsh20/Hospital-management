@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, Filter, RefreshCw, MailOpen, Mail, Send, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,8 +24,8 @@ const ReceptionistInquiries = () => {
     const fetchInquiries = async () => {
         setLoading(true);
         try {
-            const res = await axios.get('http://localhost:8080/api/inquiries');
-            setInquiries(res.data);
+            const data: any = await api.get('/inquiries');
+            setInquiries(data);
         } catch (err: any) {
             console.error(err);
             toast.error("Inbox Sync Failed: Could not retrieve inquiries.");

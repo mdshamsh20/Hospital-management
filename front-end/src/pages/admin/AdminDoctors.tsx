@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '@/lib/api';
 import { Search, UserPlus, RefreshCw, AlertCircle } from 'lucide-react';
 
 const AdminDoctors = () => {
@@ -11,10 +11,9 @@ const AdminDoctors = () => {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.get('http://localhost:8080/api/doctors');
-            setDoctors(res.data);
+            const data: any = await api.get('/doctors');
+            setDoctors(data);
         } catch (err: any) {
-            console.error(err);
             setError('Failed to fetch from API. Showing empty list.');
             setDoctors([]);
         } finally {

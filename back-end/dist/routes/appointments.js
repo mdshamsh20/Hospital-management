@@ -14,116 +14,90 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const prismaClient_1 = __importDefault(require("../prismaClient"));
+const validate_1 = require("../middleware/validate");
+const appointment_1 = require("../validations/appointment");
+const response_1 = require("../utils/response");
 const router = (0, express_1.Router)();
 // Get all appointments with patient details
 router.get('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        // @ts-ignore - Prisma client needs to be regenerated to see new fields
-        const appointments = yield prismaClient_1.default.appointment.findMany({
-            where: {
-                date: {
-                    gte: today
-                }
-            },
-            include: {
-                // @ts-ignore
-                patient: true
-            },
-            orderBy: {
-                // @ts-ignore
-                token: 'asc'
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const appointments = yield prismaClient_1.default.appointment.findMany({
+        where: {
+            date: {
+                gte: today
             }
-        });
-        res.json(appointments);
-    }
-    catch (error) {
-        res.status(500).json({ error: 'Failed to fetch appointments' });
-    }
+        },
+        include: {
+            patient: true
+        },
+        orderBy: {
+            token: 'asc'
+        }
+    });
+    res.json(appointments);
 }));
 // Register new patient and/or book appointment
-router.post('/register', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.post('/register', (0, validate_1.validate)(appointment_1.createAppointmentSchema), (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { name, age, gender, phone, departmentId, doctorId, visitType, priority, referredBy, isWalkIn, message, serviceCharge, notes } = req.body;
-    try {
-        // 1. Find or create patient
-        // @ts-ignore
-        let patient = yield prismaClient_1.default.patient.findUnique({
-            where: { phone }
-        });
-        if (!patient) {
-            // @ts-ignore
-            patient = yield prismaClient_1.default.patient.create({
-                data: {
-                    name,
-                    age: parseInt(age),
-                    gender,
-                    phone
-                }
-            });
-        }
-        // 2. Generate token for today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        // @ts-ignore
-        const lastAppt = yield prismaClient_1.default.appointment.findFirst({
-            where: { date: today },
-            // @ts-ignore
-            orderBy: { token: 'desc' }
-        });
-        const nextToken = ((lastAppt === null || lastAppt === void 0 ? void 0 : lastAppt.token) || 0) + 1;
-        // 3. Create appointment
-        // @ts-ignore
-        const appointment = yield prismaClient_1.default.appointment.create({
+    // 1. Find or create patient
+    let patient = yield prismaClient_1.default.patient.findUnique({
+        where: { phone }
+    });
+    if (!patient) {
+        patient = yield prismaClient_1.default.patient.create({
             data: {
-                // @ts-ignore
-                patientId: patient.id,
-                departmentId: departmentId ? parseInt(departmentId) : null,
-                doctorId: doctorId ? parseInt(doctorId) : null,
-                // @ts-ignore
-                visitType: visitType || 'Consultation',
-                // @ts-ignore
-                priority: priority || 'Normal',
-                // @ts-ignore
-                referredBy,
-                // @ts-ignore
-                isWalkIn: isWalkIn !== null && isWalkIn !== void 0 ? isWalkIn : true,
-                // @ts-ignore
-                notes,
-                message,
-                // @ts-ignore
-                serviceCharge: serviceCharge ? parseFloat(serviceCharge) : 0,
-                // @ts-ignore
-                token: nextToken,
-                date: today,
-                // @ts-ignore
-                status: 'Registered'
-            }, // @ts-ignore
-            include: { patient: true }
-        });
-        // 4. Audit Log
-        // @ts-ignore
-        yield prismaClient_1.default.auditLog.create({
-            data: {
-                action: 'Patient Registered',
-                module: 'Reception',
-                details: `Token ${nextToken} issued for ${name}`
+                name,
+                age: age ? parseInt(age) : null,
+                gender: gender || null,
+                phone
             }
         });
-        res.json(appointment);
     }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Registration failed' });
-    }
+    // 2. Determine appointment date
+    const apptDate = req.body.preferredDate || req.body.date ? new Date(req.body.preferredDate || req.body.date) : new Date();
+    apptDate.setHours(0, 0, 0, 0);
+    // 3. Generate token for the specific date
+    const lastAppt = yield prismaClient_1.default.appointment.findFirst({
+        where: { date: apptDate },
+        orderBy: { token: 'desc' }
+    });
+    const nextToken = ((lastAppt === null || lastAppt === void 0 ? void 0 : lastAppt.token) || 0) + 1;
+    // 4. Create appointment
+    const appointment = yield prismaClient_1.default.appointment.create({
+        data: {
+            patientId: patient.id,
+            departmentId: departmentId ? parseInt(departmentId) : null,
+            doctorId: doctorId ? parseInt(doctorId) : null,
+            visitType: visitType || 'Consultation',
+            priority: priority || 'Normal',
+            referredBy,
+            isWalkIn: isWalkIn !== null && isWalkIn !== void 0 ? isWalkIn : true,
+            notes,
+            message,
+            serviceCharge: serviceCharge ? parseFloat(serviceCharge) : 0,
+            token: nextToken,
+            date: apptDate,
+            status: 'Registered'
+        },
+        include: { patient: true }
+    });
+    // 4. Audit Log
+    yield prismaClient_1.default.auditLog.create({
+        data: {
+            action: 'Patient Registered',
+            module: 'Reception',
+            details: `Token ${nextToken} issued for ${name}`
+        }
+    });
+    (0, response_1.sendSuccess)(res, appointment, 'Appointment created successfully', 201);
 }));
 // Update appointment status (Granular Lifecycle)
-router.patch('/:id/status', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.patch('/:id/status', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { status } = req.body;
     const now = new Date();
     let data = { status };
-    // Logic: Registered -> Waiting -> With Doctor -> Procedure -> Completed -> Billing -> Closed
     if (status === 'With Doctor' || status === 'Procedure') {
         data.startedAt = now;
     }
@@ -135,16 +109,14 @@ router.patch('/:id/status', (req, res) => __awaiter(void 0, void 0, void 0, func
             where: { id: parseInt(id) },
             data
         });
-        // Automatically decrement inventory if status is 'Procedure' and type is specified?
-        // This could be a future enhancement.
         res.json(updated);
     }
     catch (error) {
-        res.status(500).json({ error: 'Failed to update status' });
+        next(error);
     }
 }));
 // Update billing
-router.patch('/:id/billing', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+router.patch('/:id/billing', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const { id } = req.params;
     const { paymentStatus, serviceCharge } = req.body;
     try {
@@ -160,7 +132,35 @@ router.patch('/:id/billing', (req, res) => __awaiter(void 0, void 0, void 0, fun
         res.json(updated);
     }
     catch (error) {
-        res.status(500).json({ error: 'Billing update failed' });
+        next(error);
+    }
+}));
+// Delete appointment
+router.delete('/:id', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    try {
+        yield prismaClient_1.default.appointment.delete({
+            where: { id: parseInt(id) }
+        });
+        res.json({ message: 'Appointment removed' });
+    }
+    catch (error) {
+        next(error);
+    }
+}));
+// Update token number
+router.patch('/:id/token', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    const { token } = req.body;
+    try {
+        const updated = yield prismaClient_1.default.appointment.update({
+            where: { id: parseInt(id) },
+            data: { token: parseInt(token) }
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        next(error);
     }
 }));
 exports.default = router;

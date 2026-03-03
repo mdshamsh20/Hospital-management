@@ -1,21 +1,27 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, AlertCircle } from 'lucide-react';
+import api from '@/lib/api';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AdminInventory = () => {
     const [items, setItems] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
+
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchInventory();
     }, []);
 
     const fetchInventory = async () => {
+        setLoading(true);
         try {
-            const response = await fetch('http://localhost:8080/api/inventory');
-            const data = await response.json();
+            const data: any = await api.get('/inventory');
             setItems(data);
         } catch (error) {
             console.error('Error fetching inventory:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -24,26 +30,46 @@ const AdminInventory = () => {
         i.category.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const [showAddItemModal, setShowAddItemModal] = useState(false);
+    const [newItemData, setNewItemData] = useState({
+        name: '',
+        category: '',
+        stock: '0',
+        unit: 'Units',
+        expiryDate: ''
+    });
+
     const [showUsageModal, setShowUsageModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState<any>(null);
     const [usageQty, setUsageQty] = useState(1);
     const [usedFor, setUsedFor] = useState('X-ray');
 
+    const handleAddItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            await api.post('/inventory', {
+                ...newItemData,
+                stock: parseInt(newItemData.stock)
+            });
+            setShowAddItemModal(false);
+            setNewItemData({ name: '', category: '', stock: '0', unit: 'Units', expiryDate: '' });
+            fetchInventory();
+        } catch (err) {
+            // Handled
+        }
+    };
+
     const handleRecordUsage = async () => {
         try {
-            await fetch('http://localhost:8080/api/inventory/consumptions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    itemId: selectedItem.id,
-                    quantity: usageQty,
-                    usedFor
-                })
+            await api.post('/inventory/consumptions', {
+                itemId: selectedItem.id,
+                quantity: usageQty,
+                usedFor
             });
             setShowUsageModal(false);
             fetchInventory();
         } catch (err) {
-            console.error('Usage record failed');
+            // Handled
         }
     };
 
@@ -55,7 +81,10 @@ const AdminInventory = () => {
                     <p className="text-slate-500 text-sm mt-1">Clinic material management & consumption audit.</p>
                 </div>
                 <div className="flex space-x-3">
-                    <button className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm hover:bg-indigo-700 transition">
+                    <button
+                        onClick={() => setShowAddItemModal(true)}
+                        className="flex items-center justify-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm hover:bg-indigo-700 transition"
+                    >
                         <Plus size={16} />
                         <span>Add New Item</span>
                     </button>
@@ -105,10 +134,29 @@ const AdminInventory = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredItems.map((item) => {
+                            {loading ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="px-6 py-4">
+                                            <Skeleton className="h-4 w-32 mb-2" />
+                                            <Skeleton className="h-3 w-20" />
+                                        </td>
+                                        <td className="px-6 py-4"><Skeleton className="h-8 w-12 mx-auto" /></td>
+                                        <td className="px-6 py-4">
+                                            <Skeleton className="h-3 w-40 mb-2" />
+                                            <Skeleton className="h-3 w-24" />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Skeleton className="h-3 w-32 mb-2" />
+                                            <Skeleton className="h-3 w-28" />
+                                        </td>
+                                        <td className="px-6 py-4 text-right"><Skeleton className="h-9 w-24 ml-auto" /></td>
+                                    </tr>
+                                ))
+                            ) : filteredItems.map((item) => {
                                 const topConsumer = item.consumptions && item.consumptions.length > 0 ? item.consumptions[0].usedFor : 'No Data';
                                 const lastRestock = item.purchases && item.purchases.length > 0 ? new Date(item.purchases[0].date).toLocaleDateString() : 'Pending Entry';
-                                const expiryMock = new Date(new Date().setMonth(new Date().getMonth() + (item.stock % 10) + 1)).toLocaleDateString();
+                                const expiryDisplay = item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'Non-Expiring';
 
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
@@ -145,8 +193,8 @@ const AdminInventory = () => {
                                                     <span className="text-xs font-medium text-slate-900">{lastRestock}</span>
                                                 </div>
                                                 <div className="flex items-center">
-                                                    <span className="text-xs font-medium text-slate-500 w-20">Est. Expiry:</span>
-                                                    <span className={`text-xs font-medium ${item.stock < 10 ? 'text-rose-600' : 'text-slate-700'}`}>{expiryMock}</span>
+                                                    <span className="text-xs font-medium text-slate-500 w-20">Expiry:</span>
+                                                    <span className={`text-xs font-medium ${item.expiryDate && new Date(item.expiryDate) < new Date() ? 'text-rose-600' : 'text-slate-700'}`}>{expiryDisplay}</span>
                                                 </div>
                                             </div>
                                         </td>
@@ -165,6 +213,99 @@ const AdminInventory = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Add New Item Modal */}
+            {showAddItemModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl w-full max-w-sm p-6 shadow-xl animate-scale-in">
+                        <h3 className="text-lg font-bold text-slate-900 mb-1">Add New Resource</h3>
+                        <p className="text-sm font-medium text-slate-500 mb-6">Create a new inventory tracking node</p>
+
+                        <form onSubmit={handleAddItem} className="space-y-4">
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Resource Name</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={newItemData.name}
+                                    onChange={e => setNewItemData({ ...newItemData, name: e.target.value })}
+                                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    placeholder="e.g. Dental Cement"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Category</label>
+                                <select
+                                    required
+                                    value={newItemData.category}
+                                    onChange={e => setNewItemData({ ...newItemData, category: e.target.value })}
+                                    className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="">Select Category</option>
+                                    <option value="Radiology">Radiology</option>
+                                    <option value="Dental">Dental</option>
+                                    <option value="Surgical">Surgical</option>
+                                    <option value="General">General</option>
+                                </select>
+                            </div>
+
+                            {['Radiology', 'Dental', 'Surgical'].includes(newItemData.category) && (
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Expiry Date</label>
+                                    <input
+                                        required
+                                        type="date"
+                                        value={newItemData.expiryDate}
+                                        onChange={e => setNewItemData({ ...newItemData, expiryDate: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1 italic">Required for medical/surgical supplies</p>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Initial Stock</label>
+                                    <input
+                                        required
+                                        type="number"
+                                        value={newItemData.stock}
+                                        onChange={e => setNewItemData({ ...newItemData, stock: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        min="0"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Unit</label>
+                                    <input
+                                        required
+                                        type="text"
+                                        value={newItemData.unit}
+                                        onChange={e => setNewItemData({ ...newItemData, unit: e.target.value })}
+                                        className="w-full bg-white border border-slate-200 rounded-lg p-2.5 text-sm font-medium text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="e.g. Pack"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex justify-end space-x-3 pt-4 border-t border-slate-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAddItemModal(false)}
+                                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-indigo-700 transition-colors"
+                                >
+                                    Create Item
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Usage Modal */}
             {showUsageModal && (

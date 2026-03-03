@@ -1,34 +1,27 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { z } from 'zod';
+import { validate } from '../middleware/validate';
+
+const labOrderSchema = z.object({
+  patientName: z.string().min(1, "Patient name is required"),
+  treatmentType: z.string().min(1, "Treatment type is required"),
+  expectedReturn: z.string().optional().nullable(),
+  cost: z.number().or(z.string()).optional().nullable(),
+  notes: z.string().optional().nullable()
+});
+
+const dentalCaseSchema = z.object({
+  patientName: z.string().min(1, "Patient name is required"),
+  type: z.string().min(1, "Type is required"),
+  status: z.string().min(1, "Status is required"),
+  date: z.string().optional().nullable()
+});
 
 const router = Router();
 const prisma = new PrismaClient();
 
-// Radiology Cases
-router.get('/radiology', async (req, res) => {
-  try {
-    const cases = await prisma.radiologyCase.findMany({
-      orderBy: { date: 'desc' },
-    });
-    res.json(cases);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch radiology cases' });
-  }
-});
-
-router.patch('/radiology/:id/status', async (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body; // Draft, Typing, Completed, Delivered
-  try {
-    const radiologyCase = await prisma.radiologyCase.update({
-      where: { id: parseInt(id) },
-      data: { status },
-    });
-    res.json(radiologyCase);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update radiology status' });
-  }
-});
+// Deprecated: Radiology routes removed and handled by reports.ts
 
 // Dental Lab Orders (NEW)
 router.get('/lab-orders', async (req, res) => {
@@ -42,7 +35,7 @@ router.get('/lab-orders', async (req, res) => {
   }
 });
 
-router.post('/lab-orders', async (req, res) => {
+router.post('/lab-orders', validate(labOrderSchema), async (req, res) => {
   const { patientName, treatmentType, expectedReturn, cost, notes } = req.body;
   try {
     const order = await prisma.dentalLabOrder.create({
@@ -91,7 +84,7 @@ router.get('/dental', async (req, res) => {
   }
 });
 
-router.post('/dental', async (req, res) => {
+router.post('/dental', validate(dentalCaseSchema), async (req, res) => {
   const { patientName, type, status, date } = req.body;
   try {
     const dentalCase = await prisma.dentalCase.create({
@@ -107,5 +100,7 @@ router.post('/dental', async (req, res) => {
     res.status(500).json({ error: 'Failed to record dental case' });
   }
 });
+
+// End of cases routes
 
 export default router;

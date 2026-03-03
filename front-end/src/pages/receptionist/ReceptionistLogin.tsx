@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import api from '@/lib/api';
+import { Lock, Mail, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { toast } from "sonner";
 const ReceptionistLogin = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const navigate = useNavigate();
 
@@ -16,18 +18,24 @@ const ReceptionistLogin = () => {
         e.preventDefault();
         setIsSubmitting(true);
 
-        // Simulation for premium feel
-        await new Promise(resolve => setTimeout(resolve, 800));
+        try {
+            const response: any = await api.post('/auth/login', { email, password });
 
-        if (password === 'frontdesk123') {
+            if (response.user.role !== 'RECEPTIONIST') {
+                toast.error("Access Denied", {
+                    description: "This portal is reserved for front desk personnel."
+                });
+                setIsSubmitting(false);
+                return;
+            }
+
             toast.success("Identity Verified", {
                 description: "Initializing Front Desk operational environment..."
             });
+            localStorage.setItem('token', response.token);
+            localStorage.setItem('role', response.user.role.toLowerCase());
             navigate('/receptionist');
-        } else {
-            toast.error("Access Denied", {
-                description: "Invalid credentials. Use 'frontdesk123' to override."
-            });
+        } catch (err: any) {
             setIsSubmitting(false);
         }
     };
@@ -47,8 +55,8 @@ const ReceptionistLogin = () => {
                             <ShieldCheck className="w-8 h-8 text-indigo-600" />
                         </div>
                     </div>
-                    <CardTitle className="text-2xl font-bold text-slate-900 tracking-tight mb-2">Front Desk Login</CardTitle>
-                    <p className="text-slate-500 text-sm">Radiance Health Infrastructure</p>
+                    <CardTitle className="text-2xl font-semibold text-slate-800 tracking-tight mb-2">Front Desk Login</CardTitle>
+                    <p className="text-slate-500 text-sm font-normal">Radiance Health Infrastructure</p>
                 </CardHeader>
 
                 <CardContent className="px-8 pb-10">
@@ -73,13 +81,20 @@ const ReceptionistLogin = () => {
                             <div className="relative group">
                                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
                                 <Input
-                                    type="password"
+                                    type={showPassword ? 'text' : 'password'}
                                     required
-                                    className="bg-white border-slate-200 text-slate-900 pl-11 py-2.5 rounded-lg focus-visible:ring-1 focus-visible:ring-indigo-600 transition-all font-medium placeholder:text-slate-400"
+                                    className="bg-white border-slate-200 text-slate-900 pl-11 pr-11 py-2.5 rounded-lg focus-visible:ring-1 focus-visible:ring-indigo-600 transition-all font-medium placeholder:text-slate-400"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
                             </div>
                         </div>
 

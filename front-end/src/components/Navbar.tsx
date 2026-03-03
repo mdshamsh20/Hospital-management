@@ -25,7 +25,7 @@ const Navbar = () => {
                         <div className="bg-primary-600 p-2 rounded-lg text-white">
                             <Activity className="w-6 h-6" />
                         </div>
-                        <span className="text-2xl font-bold text-slate-800 tracking-tight">MediCare<span className="text-primary-600">.</span></span>
+                        <span className="text-2xl font-semibold text-slate-800 tracking-tight">MediCare<span className="text-primary-600">.</span></span>
                     </Link>
 
                     {/* Desktop Menu */}

@@ -4,6 +4,7 @@
 1. **Front-end** : [Vercel](https://hospital-website-lovat-six.vercel.app/)
 2. **back-end** : [Render](https://hospital-website-backend-1how.onrender.com)
 
+http://localhost:5173/receptionist
 ### admin credentials
 - **email**: admin@gmail.com
 - **password**: admin
