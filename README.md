@@ -5,9 +5,24 @@
 2. **back-end** : [Render](https://hospital-website-backend-1how.onrender.com)
 
 http://localhost:5173/receptionist
+http://localhost:5173/admin
+http://localhost:5173/super-admin
+http://localhost:5173/
+http://localhost:5555/
+
 ### admin credentials
-- **email**: admin@gmail.com
-- **password**: admin
+- **email**: admin@medicare.com
+- **password**: admin123
+
+### receptionist credentials
+- **email**: receptionist@medicare.com
+- **password**: admin123
+
+### super admin credentials
+- **email**: admin_ops@medicare.com
+- **password**: admin123
+
+
 
 ## Project Description
 
