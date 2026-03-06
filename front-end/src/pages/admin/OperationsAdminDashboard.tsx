@@ -1,4 +1,4 @@
-import { Activity, Clock, UserCheck, IndianRupee, Users, AlertTriangle, CreditCard, Stethoscope, ArrowUpRight, CheckCircle2, FlaskConical, TrendingUp } from 'lucide-react';
+import { Activity, Clock, UserCheck, IndianRupee, Users, AlertTriangle, CreditCard, Stethoscope } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApiCache } from '@/hooks/useApiCache';
 
